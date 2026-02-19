@@ -1,0 +1,24 @@
+{
+  "comparisons": [
+    {
+      "name": "explicit_syntax",
+      "treatments": [
+        "Sample_treatment_1",
+        "Sample_treatment_2"
+    ],
+      "controls": [
+        "Sample_control_1", 
+        "Sample_control_2"
+    ]
+    },
+    {
+      "name": "glob_syntax",
+      "treatments": [
+        "Sample_treatment_*"
+    ],
+      "controls": [
+        "Sample_control_*"
+    ]
+    }
+  ]
+}
