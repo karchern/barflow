@@ -1,3 +1,5 @@
 work
 results
 .nextflow
+test_reads
+.*log*
