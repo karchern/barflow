@@ -17,6 +17,7 @@ def resolveSelectors(List<String> selectors, Set<String> allIds) {
             //def pattern = regex as java.util.regex.Pattern
             def pattern = java.util.regex.Pattern.compile(regex)
             allIds.findAll { sid -> pattern.matcher(sid).matches() }
+                  .sort()
                   .each { result << it }
         }
         else {
@@ -25,7 +26,7 @@ def resolveSelectors(List<String> selectors, Set<String> allIds) {
                 result << sel
         }
     }
-    return result as List
+    return result.toList().sort() as List
 }
 
 def buildComparisonList(List<List> tuples, Map comparisons) {
