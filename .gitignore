@@ -5,3 +5,4 @@ results
 .conda_cache
 report.html
 timeline.html
+trace.txt
