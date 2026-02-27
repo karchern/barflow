@@ -2,3 +2,6 @@ work
 results
 .nextflow
 .*log*
+.conda_cache
+report.html
+timeline.html
