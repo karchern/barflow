@@ -62,7 +62,7 @@ workflow {
         }        
         .set { merge_inputs_ch }
 
-    merge_inputs_ch.view()
+    //merge_inputs_ch.view()
 
     // comparisons_ch
     //     .map { cmp ->
@@ -89,7 +89,8 @@ workflow {
     // merge_inputs_ch.view()
 
     merge_and_analyze(
-        merge_inputs_ch
+        merge_inputs_ch,
+        good_barcodes_ch
     )
     
 }

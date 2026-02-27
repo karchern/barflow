@@ -12,7 +12,8 @@ if (length(args) < 3) {
 args <- commandArgs(trailingOnly = TRUE)
 treatments_file <- args[1]
 controls_file   <- args[2]
-output_file     <- args[3]
+good_barcodes_csv_path <- args[3]
+output_file     <- args[4]
 
 # treatments_file is a 2-column tsv without headers, first co sample-ID, second col path to matrix
 # The file contains many rows, one for each sample in the treatment group
@@ -63,5 +64,12 @@ all_data_reduced <-
         full_join,
         by = c("#Feature")
     )
+
+good_barcodes_with_locustag <- read_csv(good_barcodes_csv_path, col_names = F)
+colnames(good_barcodes_with_locustag) <- c("#Feature", "locus_tag")
+
+all_data_reduced <- all_data_reduced %>%
+    left_join(good_barcodes_with_locustag, by = "#Feature") %>%
+    relocate(`#Feature`, locus_tag)
 
 write_csv(all_data_reduced, output_file)

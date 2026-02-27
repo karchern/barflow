@@ -1,0 +1,7 @@
+name: R
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - r-base
+  - r-tidyverse

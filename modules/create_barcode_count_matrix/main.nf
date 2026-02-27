@@ -1,6 +1,6 @@
 nextflow.enable.dsl=2
 
-process create_counts_process {
+process extract_barcodes_process {
     tag { sample_id }
     publishDir "${params.outdir}/2fast2q", mode: 'copy'
 
@@ -19,10 +19,13 @@ process create_counts_process {
     mkdir -p input
     ln -s "\$PWD/\$fname" input/"\$fname"
 
+    cat ${good_barcodes_csv_path}| cut -d "," -f1 > tmp
+    paste tmp tmp > good_barcodes_in_stupid_format.csv
+
     # run 2fast2q on that single-file folder
     2fast2q -c \\
     --s input \\
-    --g "${good_barcodes_csv_path}" \\
+    --g good_barcodes_in_stupid_format.csv \\
     --o "${sample_id}.2fast2q" \\
     --ph 1 \\
     --us "${params.upstream_seq}" \\
@@ -43,7 +46,7 @@ process create_counts_process {
 }
 
 // workflow create_counts (ch, params) {
-//     ch.map { it } | create_counts_process
+//     ch.map { it } | extract_barcodes_process
 //     return sample_counts_ch
 // }
 
@@ -54,7 +57,7 @@ workflow create_counts {
   good_barcodes_ch
 
   main:
-  result = create_counts_process(ch, good_barcodes_ch)
+  result = extract_barcodes_process(ch, good_barcodes_ch)
 
   emit:
   result
