@@ -1,5 +1,6 @@
 work
 results
+test_results
 .nextflow
 .*log*
 .conda_cache

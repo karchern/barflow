@@ -1,15 +1,22 @@
-barflow - barebones Nextflow scaffold for transposon barcode sequencing
+barflow - Nextflow pipeline for TnSeq analysis
 
 Structure:
 - main.nf - DSL2 workflow
-- modules/fastp - fastp module (QC + adapter removal)
-- modules/create_barcode_count_matrix - module that calls 2FAST2Q to extract barcodes and produce per-sample counts
-- envs/ - conda environment YAMLs for tools
-- nextflow.config - profiles for local and slurm
+- modules/create_barcode_count_matrix - module that calls 2FAST2Q to extract barcodes and produce per-sample barcode counts
+- modules/merge_and_mbarq - module that merges per-sample barcode counts, adds locus tag information to the merged barcode count matrix and runs mbarq for differential barcode/locus tag analysis
 
-Usage examples:
-  nextflow run main.nf -profile standard --reads './data/*.{fastq,fq,fastq.gz,fq.gz}' --outdir results
-  nextflow run main.nf -profile slurm --reads '/path/to/*.fastq.gz' --outdir results
+simple/test case:
+with Nextflow installed, run `bash test_run.sh` 
+
+input logic:
+This pipeline assumes you have already characterized your input library and have a list of reliable barcodes (what we call `good barcodes` below) as well as their link to locus tags (genes or inter-genic regions).
+As input, we take per-sample single-end fastq files corresponding to invididual samples/replicates that were bar-seqed.
+
+Output:
+- 2fast2q
+- comparisons
+- mbarq
+  
 
 Notes:
 - Barcode length is parameterised via --barcode_length (default 8)
