@@ -31,7 +31,9 @@ workflow {
 
     //reads_ch.view { "A: All input FASTQ files: ${it}" }
 
-    good_barcodes_ch = Channel.value(file(params.good_barcodes_csv))
+    //good_barcodes_ch = Channel.value(file(params.good_barcodes_csv))
+    good_barcodes_ch = Channel.fromPath( params.good_barcodes_csv )
+    good_barcodes_ch = good_barcodes_ch.map { it }.first()
 
     // 1) Run 2FAST2Q
     create_counts(reads_ch, good_barcodes_ch)

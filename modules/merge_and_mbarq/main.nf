@@ -9,7 +9,7 @@ process merge_barcode_matrices_process {
     tuple val(comparison_name),
           val(treat_ids),   path(treat_paths),
           val(ctrl_ids),    path(ctrl_paths) 
-    val(good_barcodes_csv_path)
+    path(good_barcodes_csv_path)
 
     output:
     tuple val(comparison_name), val(treat_ids), emit: treat_ids_ch
