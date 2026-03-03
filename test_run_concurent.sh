@@ -17,7 +17,7 @@ echo "Starting test run with RUN_ID: ${RUN_ID}"
 mkdir -p "${base_outdir}/${RUN_ID}"
 
 nextflow run "${project_dir}/main.nf" \
-  -profile slurm \
+  -profile test_run \
   --test_run true \
   --samplesheet "${project_dir}/test_data/test_samplesheet.csv" \
   --good_barcodes_csv "${project_dir}/test_data/good_barcodes_with_locustag.csv" \
