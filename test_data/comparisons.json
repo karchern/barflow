@@ -20,5 +20,23 @@
         "Sample_control_*"
     ]
     }
+    ,
+    {
+      "name": "glob_syntax_with_negative_selection",
+      "treatments": [
+        "Sample_treatment_*"
+    ],
+      "controls": [
+        "Sample_control_*"
+    ],
+     "treatments_negative_selection" :
+     [
+        "Sample_treatment_1"
+     ],
+     "controls_negative_selection" :
+     [
+        "Sample_control_2"
+     ]
+    }
   ]
 }

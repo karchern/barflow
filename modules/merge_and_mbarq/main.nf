@@ -3,7 +3,7 @@ nextflow.enable.dsl=2
 process merge_barcode_matrices_process {
 
     tag { comparison_name }
-    publishDir "${params.outdir}/comparisons", mode: 'copy'
+    publishDir "${params.outdir}/merged_barcode_matrices", mode: 'copy'
 
     input:
     tuple val(comparison_name),
@@ -58,7 +58,7 @@ process create_metadata_file_for_mbarq_process {
 process run_mbarq_process {
     
     tag { comparison_name }
-    publishDir "${params.outdir}/mbarq", mode: 'copy'
+    publishDir "${params.outdir}/mbarq/${comparison_name}", mode: 'copy'
 
     input:
     tuple val(comparison_name),

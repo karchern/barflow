@@ -5,7 +5,10 @@ def buildSampleIndex(List tuples) {
     return idx
 }
 
-def resolveSelectors(List<String> selectors, Set<String> allIds) {
+// low-level: expand explicit + glob selectors to a Set of IDs
+def matchSelectors(List<String> selectors, Set<String> allIds) {
+    if( !selectors ) return [] as Set
+
     def result = [] as Set   // unique
     selectors.each { sel ->
         if( sel.contains('*') || sel.contains('?') ) {
@@ -14,10 +17,8 @@ def resolveSelectors(List<String> selectors, Set<String> allIds) {
                 .replace('.', '\\.')
                 .replace('*', '.*')
                 .replace('?', '.') + '$'
-            //def pattern = regex as java.util.regex.Pattern
             def pattern = java.util.regex.Pattern.compile(regex)
             allIds.findAll { sid -> pattern.matcher(sid).matches() }
-                  .sort()
                   .each { result << it }
         }
         else {
@@ -26,7 +27,18 @@ def resolveSelectors(List<String> selectors, Set<String> allIds) {
                 result << sel
         }
     }
-    return result.toList().sort() as List
+    return result
+}
+
+// high-level: positive − negative, returns sorted List
+def resolveSelectors(List<String> selectors,
+                     Set<String> allIds,
+                     List<String> negativeSelectors = []) {
+
+    def pos = matchSelectors(selectors ?: [], allIds)
+    def neg = matchSelectors(negativeSelectors ?: [], allIds)
+
+    return (pos - neg).toList().sort() as List
 }
 
 def buildComparisonList(List<List> tuples, Map comparisons) {
@@ -34,22 +46,22 @@ def buildComparisonList(List<List> tuples, Map comparisons) {
     def sampleIndex = buildSampleIndex(tuples)
     def allIds      = sampleIndex.keySet() as Set<String>
 
-    //println "Processing comparisons with sample index: ${sampleIndex}"
-    //println comparisons.comparisons
-
     comparisons.comparisons.collect { cmp ->
-        def name       = cmp.name as String
-            def treatSel   = (cmp.treatments ?: []) as List<String>
-            def controlSel = (cmp.controls   ?: []) as List<String>
+        def name        = cmp.name as String
 
-            def treatIds   = resolveSelectors(treatSel, allIds)
-            def controlIds = resolveSelectors(controlSel, allIds)
+        def treatSel    = (cmp.treatments ?: []) as List<String>
+        def controlSel  = (cmp.controls   ?: []) as List<String>
 
-            
-            tuple(
-                name,
-                treatIds.collect { sid -> [sid, sampleIndex[sid]] },
-                controlIds.collect { sid -> [sid, sampleIndex[sid]] }
-            )
+        def treatNegSel   = (cmp.treatments_negative_selection ?: []) as List<String>
+        def controlNegSel = (cmp.controls_negative_selection   ?: []) as List<String>
+
+        def treatIds   = resolveSelectors(treatSel, allIds, treatNegSel)
+        def controlIds = resolveSelectors(controlSel, allIds, controlNegSel)
+
+        tuple(
+            name,
+            treatIds.collect   { sid -> [sid, sampleIndex[sid]] },
+            controlIds.collect { sid -> [sid, sampleIndex[sid]] }
+        )
     }
 }
