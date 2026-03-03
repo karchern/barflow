@@ -29,7 +29,7 @@
       "controls": [
         "Sample_control_*"
     ],
-     "treatment_negative_selection" :
+     "treatments_negative_selection" :
      [
         "Sample_treatment_1"
      ],
