@@ -21,81 +21,75 @@ workflow {
     comparisons = load_json(params.comparisons)
 
     Channel
-    .fromPath(params.samplesheet)
-    .splitCsv(header:false)
-    .map { row ->
-        def filename = file(row[0]).name.replaceFirst(/(?i)\.(fastq|fq)(\.gz)?|_sequence\.txt\.gz$/, '')
-        tuple(filename, row[0])
+        .fromPath(params.samplesheet)
+        .splitCsv(header:false)
+        .map { row ->
+            def filename = file(row[0]).name.replaceFirst(/(?i)\.(fastq|fq)(\.gz)?|_sequence\.txt\.gz$/, '')
+            tuple(filename, row[0])
+        }
+        .set { reads_ch_raw }
+
+    // good barcodes
+    good_barcodes_ch = Channel.fromPath(params.good_barcodes_csv)
+                              .map { it }
+                              .first()
+
+    // decide input to create_counts
+    if ( params.samplesheet && !params.2fast2q_folder ) {
+
+        // current behaviour
+        reads_ch = reads_ch_raw
+        create_counts(reads_ch, good_barcodes_ch)
+
     }
-    .set { reads_ch }
+    else if ( !params.samplesheet && params.2fast2q_folder ) {
 
-    //reads_ch.view { "A: All input FASTQ files: ${it}" }
+        Channel
+            .fromPath("${params.2fast2q_folder}/*2fast2q")
+            .map { Path p ->
+                // remove trailing ".2fast2q" (case-insensitive)
+                def sample_id = p.name.replaceFirst(/(?i)\.2fast2q$/, '')
+                tuple(sample_id, p)
+            }
+            .toList()
+            .set { all_counts_list_ch }
+    }
+    else {
+        log.warn "\u001b[33mExactly one of --samplesheet or --2fast2q_folder must be set (not both, not neither).\u001b[0m"
+        System.exit(1)
+    }
 
-    //good_barcodes_ch = Channel.value(file(params.good_barcodes_csv))
-    good_barcodes_ch = Channel.fromPath( params.good_barcodes_csv )
-    good_barcodes_ch = good_barcodes_ch.map { it }.first()
+    // if we ran create_counts, collect its output into all_counts_list_ch
+    if ( params.samplesheet && !params.2fast2q_folder ) {
+        create_counts.out.result
+            .toList()
+            .set { all_counts_list_ch }
+    }
 
-    // 1) Run 2FAST2Q
-    create_counts(reads_ch, good_barcodes_ch)
-
-    //create_counts.out.result.view { "Counts output from create_counts: ${it}" }
-
-    // collect into a sample index: [ sample_id : Path ]
-    create_counts.out.result
-        .toList()
-        .set { all_counts_list_ch }
-
-    //all_counts_list_ch.view { "All counts list: ${it}" }
-
+    // downstream as before
     all_counts_list_ch
         .map { tuples ->
             buildComparisonList(tuples, comparisons)
         }
-        .set { comparisons_ch } 
+        .set { comparisons_ch }
 
     comparisons_ch
-        .flatMap { it }      // turn List<cmp> into stream of cmp
+        .flatMap { it }
         .map { name, treat_list, ctrl_list ->
             def treat_ids   = treat_list.collect { sid, p -> sid }
             def treat_paths = treat_list.collect { sid, p -> p }
             def ctrl_ids    = ctrl_list.collect { sid, p -> sid }
             def ctrl_paths  = ctrl_list.collect { sid, p -> p }
             tuple(name, treat_ids, treat_paths, ctrl_ids, ctrl_paths)
-        }        
+        }
         .set { merge_inputs_ch }
-
-    //merge_inputs_ch.view()
-
-    // comparisons_ch
-    //     .map { cmp ->
-    //         def name = cmp.name
-    //         def treatPaths   = cmp.treatments.collect { sid, p -> p }
-    //         def controlPaths = cmp.controls.collect { sid, p -> p }
-    //         tuple(name, treatPaths, controlPaths)
-    //     }
-    //     .set { merge_inputs_ch }
-
-    // comparisons_ch
-    //     .flatMap { list_of_tuples -> list_of_tuples }  // flatten list into stream
-    //     .set { comparisons_ch2 }
-
-    // comparisons_ch
-    // .map { cmp ->
-    //     def name = cmp[0]
-    //     def treat = cmp[1]
-    //     def control = cmp[2]
-    //     tuple(name, treat, control)
-    // }
-    // .set { merge_inputs_ch }
-
-    // merge_inputs_ch.view()
 
     merge_and_analyze(
         merge_inputs_ch,
         good_barcodes_ch
     )
-    
 }
+
 
 
 
