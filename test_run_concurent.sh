@@ -17,6 +17,8 @@ echo "Starting test run with RUN_ID: ${RUN_ID}"
 
 mkdir -p "${base_outdir}/${RUN_ID}"
 
+export NXF_CACHE_DIR="${base_outdir}/${RUN_ID}/.nextflow"   # per-run cache
+
 nextflow run "${project_dir}/main.nf" \
   -profile test_run \
   --test_run true \
@@ -26,4 +28,5 @@ nextflow run "${project_dir}/main.nf" \
   --comparisons "${project_dir}/test_data/comparisons.json" \
   --singularity true \
   --conda false \
+  -resume \
   -work-dir "${base_outdir}/${RUN_ID}/work"
