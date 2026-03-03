@@ -2,7 +2,8 @@
 set -euo pipefail
 
 base_outdir="/scratch/karcher/barflow_output"
-project_dir="/g/typas/Personal_Folders/Nic/barflow"
+#project_dir="/g/typas/Personal_Folders/Nic/barflow"
+project_dir=$(pwd)
 
 if [[ "$#" -lt 1 ]]; then
     echo "Error: RUN_ID is required as the first argument. Just needs to be a unique identifier for this test run (e.g. 'test_run_1')"
