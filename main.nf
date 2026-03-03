@@ -11,16 +11,27 @@ include {
 } from './modules/utils.nf'
 include { merge_and_analyze } from './modules/merge_and_mbarq'
 
-params.outdir       = params.outdir ?: './results'
 params.singularity  = params.singularity == true
-params.samplesheet = params.samplesheet ?: './samplesheet.csv'
 
 workflow {
 
     // load comparisons json
     comparisons = load_json(params.comparisons)
 
-    Channel
+
+
+    // good barcodes
+    good_barcodes_ch = Channel.fromPath(params.good_barcodes_csv)
+                              .map { it }
+                              .first()
+
+
+    // decide input to create_counts
+    if ( params.samplesheet && !params.fast2q_folder ) {
+
+        // current behaviour
+
+        Channel
         .fromPath(params.samplesheet)
         .splitCsv(header:false)
         .map { row ->
@@ -29,23 +40,14 @@ workflow {
         }
         .set { reads_ch_raw }
 
-    // good barcodes
-    good_barcodes_ch = Channel.fromPath(params.good_barcodes_csv)
-                              .map { it }
-                              .first()
-
-    // decide input to create_counts
-    if ( params.samplesheet && !params.2fast2q_folder ) {
-
-        // current behaviour
         reads_ch = reads_ch_raw
         create_counts(reads_ch, good_barcodes_ch)
 
     }
-    else if ( !params.samplesheet && params.2fast2q_folder ) {
+    else if ( !params.samplesheet && params.fast2q_folder ) {
 
         Channel
-            .fromPath("${params.2fast2q_folder}/*2fast2q")
+            .fromPath("${params.fast2q_folder}/*2fast2q")
             .map { Path p ->
                 // remove trailing ".2fast2q" (case-insensitive)
                 def sample_id = p.name.replaceFirst(/(?i)\.2fast2q$/, '')
@@ -55,12 +57,12 @@ workflow {
             .set { all_counts_list_ch }
     }
     else {
-        log.warn "\u001b[33mExactly one of --samplesheet or --2fast2q_folder must be set (not both, not neither).\u001b[0m"
+        log.warn "\u001b[33mExactly one of --samplesheet or --fast2q_folder must be set (not both, not neither).\u001b[0m"
         System.exit(1)
     }
 
     // if we ran create_counts, collect its output into all_counts_list_ch
-    if ( params.samplesheet && !params.2fast2q_folder ) {
+    if ( params.samplesheet && !params.fast2q_folder ) {
         create_counts.out.result
             .toList()
             .set { all_counts_list_ch }
