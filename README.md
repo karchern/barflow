@@ -91,5 +91,6 @@ Next steps you mentioned:
 - The comparisons defined in the `comparison.json` are based on the entries of the `samplesheet.txt`. What this means is that only what is in the `samplesheet.txt` can be handed over to the differential abundance computation. It is therefore crucial that you 
   - If you use the glob syntax, it will base this on the sampleIDs inferred from the `samplesheet.txt`, _not_ what has already been processed by `2fast2q`
   - If you use the explicit syntax and you specify sampleIDs that are _not_ in the `samplesheet.txt`, the pipeline will crash at the mbarq step because it is looking for a sample to load that it cannot find.
+- TODO: Explain negative selection
 
 This is due to the way Nextflow handles inputs

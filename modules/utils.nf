@@ -46,7 +46,38 @@ def buildComparisonList(List<List> tuples, Map comparisons) {
     def sampleIndex = buildSampleIndex(tuples)
     def allIds      = sampleIndex.keySet() as Set<String>
 
+    def requiredKeys = [
+        'name', 
+        'treatments',
+        'controls'
+    ]
+
+    def allowedKeys = [
+        'name',
+        'treatments',
+        'controls',
+        'treatments_negative_selection',
+        'controls_negative_selection'
+    ] as Set
+
     comparisons.comparisons.collect { cmp ->
+        // check for unexpected keys
+        def cmpKeys      = (cmp as Map).keySet() as Set
+        def invalidKeys  = cmpKeys - allowedKeys
+        def missingKeys  = requiredKeys - cmpKeys
+        if( missingKeys ) {
+            throw new IllegalArgumentException(
+                "Missing required fields in comparison '${cmp.name}': ${missingKeys.join(', ')}\nRequired fields are: ${requiredKeys.join(', ')}\nYou probably have a typo in your comparisons.json :)"
+            )
+        }        
+        if( invalidKeys ) {
+            throw new IllegalArgumentException(
+                "Invalid fields in comparison '${cmp.name}': ${invalidKeys.join(', ')}\nAllowed fields are: ${allowedKeys.join(', ')}\nYou probably have a typo in your comparisons.json :)"
+            )
+        }
+
+
+
         def name        = cmp.name as String
 
         def treatSel    = (cmp.treatments ?: []) as List<String>
@@ -65,3 +96,4 @@ def buildComparisonList(List<List> tuples, Map comparisons) {
         )
     }
 }
+
