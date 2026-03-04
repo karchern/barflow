@@ -124,7 +124,7 @@ def createSampleInputChannelAndDecideIfToRun2Fast2Q(String samplesheet, String t
                 tuple(sample_id, p)
             }
 
-    return [ reads_ch: reads_ch, run_counts: true ]
+    return [ reads_ch: reads_ch, run_counts: false ]
     }
     else {
         log.warn "\u001b[33mExactly one of --samplesheet or --twofast2q_folder must be set (not both, not neither).\u001b[0m"
