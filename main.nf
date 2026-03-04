@@ -20,6 +20,33 @@ def cli_twofast2q = params.containsKey('2fast2q_folder') ? params['2fast2q_folde
 params.samplesheet      = params.containsKey('samplesheet')      ? params.samplesheet      : null
 params.twofast2q_folder = params.containsKey('twofast2q_folder') ? params.twofast2q_folder : cli_twofast2q
 
+// Sanity check for existing 2fast2q folder
+if( params.twofast2q_folder ) {
+
+    def dir = file(params.twofast2q_folder)
+
+    if( !dir.exists() ) {
+        log.error "Provided --twofast2q_folder '${params.twofast2q_folder}' does not exist."
+        System.exit(1)
+    }
+    if( !dir.isDirectory() ) {
+        log.error "Provided --twofast2q_folder '${params.twofast2q_folder}' is not a directory."
+        System.exit(1)
+    }
+
+    // list files ending in '2fast2q' (top level only)
+    def files = dir.listFiles()?.findAll { f ->
+        f.isFile() && f.name.endsWith('2fast2q')
+    } ?: []
+
+    if( !files ) {
+        log.error "Directory '${params.twofast2q_folder}' contains no files ending in '2fast2q'."
+        System.exit(1)
+    }
+
+    log.info "Found ${files.size()} file(s) ending in '2fast2q' in '${params.twofast2q_folder}\nWill try to build mbarq comparisons from those :)'."
+}
+
 workflow {
 
     // load comparisons json
