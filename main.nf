@@ -24,6 +24,16 @@ params.remove_all_0_barcodes = params.containsKey('remove_all_0_barcodes') ? par
 params.lowly_abundant_barcode_cutoff = params.containsKey('lowly_abundant_barcode_cutoff') ? params.lowly_abundant_barcode_cutoff : 0
 params.filter_on_what = params.containsKey('filter_on_what') ? params.filter_on_what : 'treatments_and_controls' // allowed values: 'treatments_and_controls', 'treatments_only', 'controls_only'
 
+def mbarqConfig = [
+    normalization                   : params.mbarq_normalization,
+]
+
+def filterConfig = [
+    lowly_abundant_barcode_cutoff   : params.lowly_abundant_barcode_cutoff as Integer,
+    filter_on_what                  : params.filter_on_what as String,
+    remove_all_0_barcodes           : params.remove_all_0_barcodes as Boolean
+]
+
 // Sanity check for existing 2fast2q folder
 if( params.twofast2q_folder ) {
 
@@ -116,10 +126,8 @@ workflow {
     merge_and_analyze(
         merge_inputs_ch,
         good_barcodes_ch,
-        params.mbarq_normalization,
-        params.lowly_abundant_barcode_cutoff,
-        params.filter_on_what,
-        params.remove_all_0_barcodes
+        filterConfig,
+        mbarqConfig,
     )
 }
 

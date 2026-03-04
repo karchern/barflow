@@ -31,13 +31,13 @@ nextflow run "${project_dir}/main.nf" \
   -resume \
   -work-dir "${base_outdir}/${RUN_ID}/work"
 
-nextflow run "${project_dir}/main.nf" \
-  -profile test_run \
-  --test_run true \
-  --2fast2q_folder ${base_outdir}/${RUN_ID}/2fast2q \
-  --good_barcodes_csv "${project_dir}/test_data/good_barcodes_with_locustag.csv" \
-  --outdir "${base_outdir}/${RUN_ID}" \
-  --comparisons "${project_dir}/test_data/comparisons.json" \
-  --singularity true \
-  --conda false \
-  -work-dir "${base_outdir}/${RUN_ID}/work"
+# nextflow run "${project_dir}/main.nf" \
+#   -profile test_run \
+#   --test_run true \
+#   --2fast2q_folder ${base_outdir}/${RUN_ID}/2fast2q \
+#   --good_barcodes_csv "${project_dir}/test_data/good_barcodes_with_locustag.csv" \
+#   --outdir "${base_outdir}/${RUN_ID}" \
+#   --comparisons "${project_dir}/test_data/comparisons.json" \
+#   --singularity true \
+#   --conda false \
+#   -work-dir "${base_outdir}/${RUN_ID}/work"

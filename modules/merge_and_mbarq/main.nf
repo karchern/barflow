@@ -64,7 +64,7 @@ process run_mbarq_process {
     tuple val(comparison_name),
           path(merged_matrices_path),
           path(mbarq_meta_path)
-    val(mbarq_normalization)
+    val(mbarq_config)
     
 
     output:
@@ -77,7 +77,7 @@ process run_mbarq_process {
     """
     mbarq analyze -i ${merged_matrices_path} \
     -s ${mbarq_meta_path} \
-    --treatment_column treatment --baseline control --norm_method ${mbarq_normalization}
+    --treatment_column treatment --baseline control --norm_method ${mbarq_config.mbarq_normalization}
     """
 }
 
@@ -90,9 +90,7 @@ process filter_barcodes_in_merged_matrices {
     tuple val(comparison_name),
           path(merged_matrices_path),
           path(mbarq_meta_path)
-    val(lowly_abundant_barcode_cutoff)
-    val(filter_on_what)
-    val(remove_all_0_barcodes)
+    val(filter_config)
 
     output:
     tuple val(comparison_name),
@@ -101,8 +99,9 @@ process filter_barcodes_in_merged_matrices {
 
     script:
     """
-    echo "lowly_abundant_barcode_cutoff=${lowly_abundant_barcode_cutoff}"
-    echo "filter_on_what=${filter_on_what}"
+    echo "lowly_abundant_barcode_cutoff=${filter_config.lowly_abundant_barcode_cutoff}"
+    echo "filter_on_what=${filter_config.filter_on_what}"
+    echo "remove_all_0_barcodes=${filter_config.remove_all_0_barcodes}"
 
     cp ${merged_matrices_path} ${comparison_name}.filtered.merged.barcode.matrices.csv
     """
@@ -136,30 +135,25 @@ workflow merge_and_analyze {
   take:
     comparisons_ch
     good_barcodes_ch
-    mbarq_normalization
-    lowly_abundant_barcode_cutoff
-    filter_on_what
-    remove_all_0_barcodes
+    filter_config
+    mbarq_config
 
   main:
     mr = merge_barcode_matrices_process(comparisons_ch, good_barcodes_ch)
 
-    ch_joined   = mr.treat_ids_ch.join(mr.ctrl_ids_ch)
-    mbarq_meta  = create_metadata_file_for_mbarq_process(ch_joined)
+    ch_joined  = mr.treat_ids_ch.join(mr.ctrl_ids_ch)
+    mbarq_meta = create_metadata_file_for_mbarq_process(ch_joined)
 
-    // join merged matrix with meta and filter
     merged_with_meta = mr.merged_matrices_ch.join(mbarq_meta)
 
     mr_filtered = filter_barcodes_in_merged_matrices(
         merged_with_meta,
-        lowly_abundant_barcode_cutoff,
-        filter_on_what,
-        remove_all_0_barcodes
-        )
+        filter_config
+    )
 
     mbarq_results = run_mbarq_process(
         mr_filtered.merged_matrices_filtered_ch.join(mbarq_meta),
-        mbarq_normalization
+        mbarq_config
     )
 
   emit:
