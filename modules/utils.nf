@@ -41,6 +41,16 @@ def resolveSelectors(List<String> selectors,
     return (pos - neg).toList().sort() as List
 }
 
+// helper for buildComparisonList
+def asStringList(value) {
+    if( value == null )
+        return [] as List<String>
+    if( value instanceof List )
+        return value.collect { it as String }
+    // single scalar (String, GString, whatever): wrap in list
+    return [ value as String ]
+}
+
 def buildComparisonList(List<List> tuples, Map comparisons) {
     // tuples: [ [sid1, path1], [sid2, path2], ... ]
     def sampleIndex = buildSampleIndex(tuples)
@@ -80,11 +90,11 @@ def buildComparisonList(List<List> tuples, Map comparisons) {
 
         def name        = cmp.name as String
 
-        def treatSel    = (cmp.treatments ?: []) as List<String>
-        def controlSel  = (cmp.controls   ?: []) as List<String>
+        def treatSel    = asStringList(cmp.treatments)
+        def controlSel  = asStringList(cmp.controls)
 
-        def treatNegSel   = (cmp.treatments_negative_selection ?: []) as List<String>
-        def controlNegSel = (cmp.controls_negative_selection   ?: []) as List<String>
+        def treatNegSel   = asStringList(cmp.treatments_negative_selection)
+        def controlNegSel = asStringList(cmp.controls_negative_selection)
 
         def treatIds   = resolveSelectors(treatSel, allIds, treatNegSel)
         def controlIds = resolveSelectors(controlSel, allIds, controlNegSel)
