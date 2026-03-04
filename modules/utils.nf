@@ -97,3 +97,38 @@ def buildComparisonList(List<List> tuples, Map comparisons) {
     }
 }
 
+// Decide and build all_counts_list_ch based on params
+def createSampleInputChannelAndDecideIfToRun2Fast2Q(String samplesheet, String twofast2q_folder, good_barcodes_ch) {
+
+
+    if ( samplesheet && !twofast2q_folder ) {
+
+        def reads_ch = Channel
+            .fromPath(samplesheet)
+            .splitCsv(header:false)
+            .map { row ->
+                def filename = file(row[0]).name.replaceFirst(/(?i)\.(fastq|fq)(\.gz)?|_sequence\.txt\.gz$/, '')
+                tuple(filename, row[0])
+            }
+
+
+        return [ reads_ch: reads_ch, run_counts: true ]
+
+    }
+    else if( !samplesheet && twofast2q_folder ) {
+
+        def reads_ch = Channel
+            .fromPath("${twofast2q_folder}/*2fast2q")
+            .map { Path p ->
+                def sample_id = p.name.replaceFirst(/(?i)\.2fast2q$/, '')
+                tuple(sample_id, p)
+            }
+
+    return [ reads_ch: reads_ch, run_counts: true ]
+    }
+    else {
+        log.warn "\u001b[33mExactly one of --samplesheet or --twofast2q_folder must be set (not both, not neither).\u001b[0m"
+        System.exit(1)
+    }
+
+}

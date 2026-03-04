@@ -8,6 +8,7 @@ include {
     buildSampleIndex
     resolveSelectors
     buildComparisonList
+    createSampleInputChannelAndDecideIfToRun2Fast2Q
 } from './modules/utils.nf'
 include { merge_and_analyze } from './modules/merge_and_mbarq'
 
@@ -34,46 +35,21 @@ workflow {
 
 
 
-    // decide input to create_counts
-    if ( params.samplesheet && !params.twofast2q_folder ) {
+    input_info = createSampleInputChannelAndDecideIfToRun2Fast2Q(
+        params.samplesheet,
+        params.twofast2q_folder,
+        good_barcodes_ch
+    )
 
-        // current behaviour
+    def reads_ch   = input_info.reads_ch
+    def run_counts = input_info.run_counts
 
-        Channel
-        .fromPath(params.samplesheet)
-        .splitCsv(header:false)
-        .map { row ->
-            def filename = file(row[0]).name.replaceFirst(/(?i)\.(fastq|fq)(\.gz)?|_sequence\.txt\.gz$/, '')
-            tuple(filename, row[0])
-        }
-        .set { reads_ch_raw }
-
-        reads_ch = reads_ch_raw
+    if( run_counts ) {
         create_counts(reads_ch, good_barcodes_ch)
-
-    }
-    else if ( !params.samplesheet && params.twofast2q_folder ) {
-
-        Channel
-            .fromPath("${params.twofast2q_folder}/*2fast2q")
-            .map { Path p ->
-                // remove trailing ".2fast2q" (case-insensitive)
-                def sample_id = p.name.replaceFirst(/(?i)\.2fast2q$/, '')
-                tuple(sample_id, p)
-            }
-            .toList()
-            .set { all_counts_list_ch }
+        all_counts_list_ch = create_counts.out.result.toList()
     }
     else {
-        log.warn "\u001b[33mExactly one of --samplesheet or --twofast2q_folder must be set (not both, not neither).\u001b[0m"
-        System.exit(1)
-    }
-
-    // if we ran create_counts, collect its output into all_counts_list_ch
-    if ( params.samplesheet && !params.twofast2q_folder ) {
-        create_counts.out.result
-            .toList()
-            .set { all_counts_list_ch }
+        all_counts_list_ch = reads_ch.toList()
     }
 
     // downstream as before
