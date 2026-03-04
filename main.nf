@@ -12,6 +12,8 @@ include {
 include { merge_and_analyze } from './modules/merge_and_mbarq'
 
 params.singularity  = params.singularity == true
+params.twofast2q_folder = params.twofast2q_folder ?:
+                          params['2fast2q_folder'] ?: null
 
 workflow {
 
@@ -26,8 +28,10 @@ workflow {
                               .first()
 
 
+
+
     // decide input to create_counts
-    if ( params.samplesheet && !params.fast2q_folder ) {
+    if ( params.samplesheet && !params.twofast2q_folder ) {
 
         // current behaviour
 
@@ -44,10 +48,10 @@ workflow {
         create_counts(reads_ch, good_barcodes_ch)
 
     }
-    else if ( !params.samplesheet && params.fast2q_folder ) {
+    else if ( !params.samplesheet && params.twofast2q_folder ) {
 
         Channel
-            .fromPath("${params.fast2q_folder}/*2fast2q")
+            .fromPath("${params.twofast2q_folder}/*2fast2q")
             .map { Path p ->
                 // remove trailing ".2fast2q" (case-insensitive)
                 def sample_id = p.name.replaceFirst(/(?i)\.2fast2q$/, '')
@@ -57,12 +61,12 @@ workflow {
             .set { all_counts_list_ch }
     }
     else {
-        log.warn "\u001b[33mExactly one of --samplesheet or --fast2q_folder must be set (not both, not neither).\u001b[0m"
+        log.warn "\u001b[33mExactly one of --samplesheet or --twofast2q_folder must be set (not both, not neither).\u001b[0m"
         System.exit(1)
     }
 
     // if we ran create_counts, collect its output into all_counts_list_ch
-    if ( params.samplesheet && !params.fast2q_folder ) {
+    if ( params.samplesheet && !params.twofast2q_folder ) {
         create_counts.out.result
             .toList()
             .set { all_counts_list_ch }

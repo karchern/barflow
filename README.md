@@ -10,7 +10,7 @@ This pipeline assumes you have already characterized your input library and have
 
 Specifically, as input, we need:
 - Per-sample single-end fastq files corresponding to invididual samples/replicates that were bar-. Specified via parameter `--samplesheet` (see below).
-  - Alternatively, you can supply a folder containing 2fast2q output files, one per sample. Files should be called `${sampleID}.2fast2q`, and path to the folder containing these files should be specified using `--fast2q_folder` (it's _not_ `--2fast2q_folder` - Nextflow does not look parameters to start with a number)
+  - Alternatively, you can supply a folder containing 2fast2q output files, one per sample. Files should be called `${sampleID}.2fast2q`, and path to the folder containing these files should be specified using `--2fast2q_folder`. This is mutually exclusive with `--samplesheet`, and an error will be thrown if both are supplied at the same time.
 - File specifying reliable barcodes. Specified via parameter `--good_barcodes_csv` (see below)
 - File specifying which samples are supposed to be treated as 'control' or 'treatment' for the differential barcode analysis via parameter `--comparisons` (see below).
 

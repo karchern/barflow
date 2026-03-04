@@ -22,7 +22,7 @@ export NXF_CACHE_DIR="${base_outdir}/${RUN_ID}/.nextflow"   # per-run cache
 nextflow run "${project_dir}/main.nf" \
   -profile test_run \
   --test_run true \
-  --fast2q_folder "/scratch/karcher/barflow_output/blablub/2fast2q/" \
+  --2fast2q_folder "/scratch/karcher/barflow_output/blablub/2fast2q/" \
   --good_barcodes_csv "${project_dir}/test_data/good_barcodes_with_locustag.csv" \
   --outdir "${base_outdir}/${RUN_ID}" \
   --comparisons "${project_dir}/test_data/comparisons.json" \
