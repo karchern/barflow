@@ -64,6 +64,7 @@ process run_mbarq_process {
     tuple val(comparison_name),
           path(merged_matrices_path),
           path(mbarq_meta_path)
+    val(mbarq_normalization)
     
 
     output:
@@ -76,7 +77,7 @@ process run_mbarq_process {
     """
     mbarq analyze -i ${merged_matrices_path} \
     -s ${mbarq_meta_path} \
-    --treatment_column treatment --baseline control
+    --treatment_column treatment --baseline control --norm_method ${mbarq_normalization}
     """
 }
 
@@ -106,6 +107,7 @@ workflow merge_and_analyze {
   take:
   comparisons_ch
   good_barcodes_ch
+  mbarq_normalization
 
   main:
   mr = merge_barcode_matrices_process(comparisons_ch, good_barcodes_ch)
@@ -113,7 +115,8 @@ workflow merge_and_analyze {
   mbarq_meta = create_metadata_file_for_mbarq_process(ch_joined)
 
   mbarq_results = run_mbarq_process(
-    mr.merged_matrices_ch.join(mbarq_meta)
+    mr.merged_matrices_ch.join(mbarq_meta),
+    mbarq_normalization
   )
 
   emit:
