@@ -19,6 +19,7 @@ def cli_twofast2q = params.containsKey('2fast2q_folder') ? params['2fast2q_folde
 // unified internal params, with explicit defaults
 params.samplesheet      = params.containsKey('samplesheet')      ? params.samplesheet      : null
 params.twofast2q_folder = params.containsKey('twofast2q_folder') ? params.twofast2q_folder : cli_twofast2q
+params.mbarq_normalization = params.containsKey('mbarq_normalization') ? params.mbarq_normalization : 'median'
 
 // Sanity check for existing 2fast2q folder
 if( params.twofast2q_folder ) {
@@ -99,7 +100,8 @@ workflow {
 
     merge_and_analyze(
         merge_inputs_ch,
-        good_barcodes_ch
+        good_barcodes_ch,
+        params.mbarq_normalization
     )
 }
 
