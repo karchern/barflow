@@ -13,7 +13,7 @@ fi
 
 RUN_ID="$1"
 
-echo "Starting test run with RUN_ID: ${RUN_ID}"
+echo "Starting test run with RUN_ID: ${RUN_ID} with base_outdir ${base_outdir}"
 
 mkdir -p "${base_outdir}/${RUN_ID}"
 
@@ -23,6 +23,18 @@ nextflow run "${project_dir}/main.nf" \
   -profile test_run \
   --test_run true \
   --samplesheet "${project_dir}/test_data/test_samplesheet.csv" \
+  --good_barcodes_csv "${project_dir}/test_data/good_barcodes_with_locustag.csv" \
+  --outdir "${base_outdir}/${RUN_ID}" \
+  --comparisons "${project_dir}/test_data/comparisons.json" \
+  --singularity true \
+  --conda false \
+  -resume \
+  -work-dir "${base_outdir}/${RUN_ID}/work"
+
+nextflow run "${project_dir}/main.nf" \
+  -profile test_run \
+  --test_run true \
+  --2fast2q_folder ${base_outdir}/${RUN_ID}/2fast2q \
   --good_barcodes_csv "${project_dir}/test_data/good_barcodes_with_locustag.csv" \
   --outdir "${base_outdir}/${RUN_ID}" \
   --comparisons "${project_dir}/test_data/comparisons.json" \

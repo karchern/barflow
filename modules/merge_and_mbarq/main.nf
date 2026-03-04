@@ -81,6 +81,35 @@ process run_mbarq_process {
     """
 }
 
+process filter_barcodes_in_merged_matrices {
+
+    tag { comparison_name }
+    publishDir "${params.outdir}/filtered_barcode_matrices", mode: 'copy'
+
+    input:
+    tuple val(comparison_name),
+          path(merged_matrices_path),
+          path(mbarq_meta_path)
+    val(lowly_abundant_barcode_cutoff)
+    val(filter_on_what)
+    val(remove_all_0_barcodes)
+
+    output:
+    tuple val(comparison_name),
+          path("${comparison_name}.filtered.merged.barcode.matrices.csv"),
+          emit: merged_matrices_filtered_ch
+
+    script:
+    """
+    echo "lowly_abundant_barcode_cutoff=${lowly_abundant_barcode_cutoff}"
+    echo "filter_on_what=${filter_on_what}"
+
+    cp ${merged_matrices_path} ${comparison_name}.filtered.merged.barcode.matrices.csv
+    """
+}
+
+
+
 // process add_locus_tags_to_barcode_matrices_process {
 
 //     tag { comparison_name }
@@ -105,20 +134,34 @@ process run_mbarq_process {
 workflow merge_and_analyze {
 
   take:
-  comparisons_ch
-  good_barcodes_ch
-  mbarq_normalization
+    comparisons_ch
+    good_barcodes_ch
+    mbarq_normalization
+    lowly_abundant_barcode_cutoff
+    filter_on_what
+    remove_all_0_barcodes
 
   main:
-  mr = merge_barcode_matrices_process(comparisons_ch, good_barcodes_ch)
-  ch_joined = mr.treat_ids_ch.join(mr.ctrl_ids_ch) 
-  mbarq_meta = create_metadata_file_for_mbarq_process(ch_joined)
+    mr = merge_barcode_matrices_process(comparisons_ch, good_barcodes_ch)
 
-  mbarq_results = run_mbarq_process(
-    mr.merged_matrices_ch.join(mbarq_meta),
-    mbarq_normalization
-  )
+    ch_joined   = mr.treat_ids_ch.join(mr.ctrl_ids_ch)
+    mbarq_meta  = create_metadata_file_for_mbarq_process(ch_joined)
+
+    // join merged matrix with meta and filter
+    merged_with_meta = mr.merged_matrices_ch.join(mbarq_meta)
+
+    mr_filtered = filter_barcodes_in_merged_matrices(
+        merged_with_meta,
+        lowly_abundant_barcode_cutoff,
+        filter_on_what,
+        remove_all_0_barcodes
+        )
+
+    mbarq_results = run_mbarq_process(
+        mr_filtered.merged_matrices_filtered_ch.join(mbarq_meta),
+        mbarq_normalization
+    )
 
   emit:
-  mbarq_meta
+    mbarq_meta
 }

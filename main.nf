@@ -20,6 +20,9 @@ def cli_twofast2q = params.containsKey('2fast2q_folder') ? params['2fast2q_folde
 params.samplesheet      = params.containsKey('samplesheet')      ? params.samplesheet      : null
 params.twofast2q_folder = params.containsKey('twofast2q_folder') ? params.twofast2q_folder : cli_twofast2q
 params.mbarq_normalization = params.containsKey('mbarq_normalization') ? params.mbarq_normalization : 'median'
+params.remove_all_0_barcodes = params.containsKey('remove_all_0_barcodes') ? params.remove_all_0_barcodes : false
+params.lowly_abundant_barcode_cutoff = params.containsKey('lowly_abundant_barcode_cutoff') ? params.lowly_abundant_barcode_cutoff : 0
+params.filter_on_what = params.containsKey('filter_on_what') ? params.filter_on_what : 'treatments_and_controls' // allowed values: 'treatments_and_controls', 'treatments_only', 'controls_only'
 
 // Sanity check for existing 2fast2q folder
 if( params.twofast2q_folder ) {
@@ -46,6 +49,18 @@ if( params.twofast2q_folder ) {
     }
 
     log.info "Found ${files.size()} file(s) ending in '2fast2q' in '${params.twofast2q_folder}\nWill try to build mbarq comparisons from those :)'."
+}
+
+// sanity check for filter_on_what
+def allowedFilterValues = [
+    'treatments_and_controls',
+    'treatments_only',
+    'controls_only'
+] as Set
+
+if( !allowedFilterValues.contains(params.filter_on_what as String) ) {
+    log.error "Invalid value for --filter_on_what: '${params.filter_on_what}'. Allowed values: ${allowedFilterValues.join(', ')}"
+    System.exit(1)
 }
 
 workflow {
@@ -101,7 +116,10 @@ workflow {
     merge_and_analyze(
         merge_inputs_ch,
         good_barcodes_ch,
-        params.mbarq_normalization
+        params.mbarq_normalization,
+        params.lowly_abundant_barcode_cutoff,
+        params.filter_on_what,
+        params.remove_all_0_barcodes
     )
 }
 
