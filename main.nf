@@ -12,8 +12,12 @@ include {
 include { merge_and_analyze } from './modules/merge_and_mbarq'
 
 params.singularity  = params.singularity == true
-params.twofast2q_folder = params.twofast2q_folder ?:
-                          params['2fast2q_folder'] ?: null
+// raw CLI param (may or may not exist)
+def cli_twofast2q = params.containsKey('2fast2q_folder') ? params['2fast2q_folder'] : null
+
+// unified internal params, with explicit defaults
+params.samplesheet      = params.containsKey('samplesheet')      ? params.samplesheet      : null
+params.twofast2q_folder = params.containsKey('twofast2q_folder') ? params.twofast2q_folder : cli_twofast2q
 
 workflow {
 
