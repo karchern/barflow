@@ -78,7 +78,7 @@ process run_mbarq_process {
     """
     mbarq analyze -i ${merged_matrices_path} \
     -s ${mbarq_meta_path} \
-    --treatment_column treatment --baseline control --norm_method ${mbarq_config.mbarq_normalization}
+    --treatment_column treatment --baseline control --norm_method ${mbarq_config.normalization}
     """
 }
 

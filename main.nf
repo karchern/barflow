@@ -12,28 +12,21 @@ include {
 } from './modules/utils.nf'
 include { merge_and_analyze } from './modules/merge_and_mbarq'
 
-params.singularity  = params.singularity == true
+//params.singularity  = params.singularity == true
 // raw CLI param (may or may not exist)
 def cli_twofast2q = params.containsKey('2fast2q_folder') ? params['2fast2q_folder'] : null
-
-// unified internal params, with explicit defaults
-params.samplesheet      = params.containsKey('samplesheet')      ? params.samplesheet      : null
-params.twofast2q_folder = params.containsKey('twofast2q_folder') ? params.twofast2q_folder : cli_twofast2q
-params.mbarq_normalization = params.containsKey('mbarq_normalization') ? params.mbarq_normalization : 'median'
-params.remove_all_0_barcodes = params.containsKey('remove_all_0_barcodes') ? params.remove_all_0_barcodes : false
-params.lowly_abundant_barcode_cutoff = params.containsKey('lowly_abundant_barcode_cutoff') ? params.lowly_abundant_barcode_cutoff : 0
-params.filter_on_what = params.containsKey('filter_on_what') ? params.filter_on_what : 'both' // allowed values: 'treatments_only', 'controls_only', "both"
+if( !params.twofast2q_folder && cli_twofast2q )
+    params.twofast2q_folder = cli_twofast2q
 
 def mbarqConfig = [
-    normalization                   : params.mbarq_normalization,
+    normalization: params.mbarq_normalization,
 ]
 
 def filterConfig = [
-    lowly_abundant_barcode_cutoff   : params.lowly_abundant_barcode_cutoff as Integer,
-    filter_on_what                  : params.filter_on_what as String,
-    remove_all_0_barcodes           : params.remove_all_0_barcodes as Boolean
+    lowly_abundant_barcode_cutoff : params.lowly_abundant_barcode_cutoff as Integer,
+    filter_on_what                : params.filter_on_what as String,
+    remove_all_0_barcodes         : params.remove_all_0_barcodes as Boolean
 ]
-
 // Sanity check for existing 2fast2q folder
 if( params.twofast2q_folder ) {
 
@@ -64,8 +57,8 @@ if( params.twofast2q_folder ) {
 // sanity check for filter_on_what
 def allowedFilterValues = [
     'both',
-    'treatments_only',
-    'controls_only'
+    'treatments',
+    'controls'
 ] as Set
 
 if( !allowedFilterValues.contains(params.filter_on_what as String) ) {
