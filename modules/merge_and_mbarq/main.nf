@@ -158,10 +158,6 @@ process run_mbarq_process {
           emit: mbarq_experiment_log
 
     tuple val(comparison_name),
-          path("${comparison_name}.filtered.merged.barcode.matrices_treated_vs_control.log"),
-          emit: mbarq_experiment_log
-
-    tuple val(comparison_name),
           path(log_path),
           emit: mbarq_log          
 
