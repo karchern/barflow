@@ -142,8 +142,24 @@ process run_mbarq_process {
 
     output:
     tuple val(comparison_name),
-          path("*"),
-          emit: mbarq_results
+          path("${comparison_name}.filtered.merged.barcode.matrices_treated_vs_control.log"),
+          emit: mbarq_treated_vs_control_log
+
+    tuple val(comparison_name),
+          path("${comparison_name}.filtered.merged.barcode.matrices_rra_results.csv"),
+          emit: mbarq_rra_results
+
+    tuple val(comparison_name),
+          path("${comparison_name}.filtered.merged.barcode.matrices_barcodes_results.csv"),
+          emit: mbarq_barcodes_results
+
+    tuple val(comparison_name),
+          path("${comparison_name}.filtered.merged.barcode.matrices_Experiment.log"),
+          emit: mbarq_experiment_log
+
+    tuple val(comparison_name),
+          path("${comparison_name}.filtered.merged.barcode.matrices_treated_vs_control.log"),
+          emit: mbarq_experiment_log
 
     tuple val(comparison_name),
           path(log_path),
