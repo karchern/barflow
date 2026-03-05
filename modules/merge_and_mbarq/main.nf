@@ -1,6 +1,10 @@
 nextflow.enable.dsl=2
 
 
+/*
+ * PROCESSES
+ */
+
 process merge_barcode_matrices_process {
 
     tag { comparison_name }
@@ -19,9 +23,11 @@ process merge_barcode_matrices_process {
     tuple val(comparison_name), path("${comparison_name}.merged.barcode.matrices.csv"), emit: merged_matrices_ch
     tuple val(comparison_name), path("treatments.tsv"), emit: treatments_ch
     tuple val(comparison_name), path("controls.tsv"), emit: controls_ch
+
+    // step-specific log
     tuple val(comparison_name),
-          path("${comparison_name}.master.log.tx"),
-          emit: log_ch
+          path("${comparison_name}.merge.log.txt"),
+          emit: merge_log_ch
 
     script:
     """
@@ -29,16 +35,16 @@ process merge_barcode_matrices_process {
     paste <(printf "%s\n" ${ctrl_ids.join(' ')} ) <(printf "%s\n" ${ctrl_paths.join(' ')} ) > controls.tsv
     touch ${comparison_name}.merged.barcode.matrices.tsv
 
-    echo "### merge_barcode_matrices_process for ${comparison_name} ###" > ${comparison_name}.master.log.tx
-
     join_barcode_matrices.r treatments.tsv controls.tsv ${good_barcodes_csv_path} ${comparison_name}.merged.barcode.matrices.csv
 
-    # create initial log
     {
+        echo "### merge_barcode_matrices_process for ${comparison_name} ###"
         echo "comparison_name=${comparison_name}"
-        echo "treatments.tsv:\n\$(cat treatments.tsv)"
-        echo "controls.tsv:\n\$(cat controls.tsv)"
-    } >> ${comparison_name}.master.log.tx
+        echo "treatments.tsv:"
+        cat treatments.tsv
+        echo "controls.tsv:"
+        cat controls.tsv
+    } > ${comparison_name}.merge.log.txt
     """
 }
 
@@ -51,8 +57,7 @@ process create_metadata_file_for_mbarq_process {
     input:
     tuple val(comparison_name),
           val(treat_ids),
-          val(ctrl_ids),
-          path(log_path)
+          val(ctrl_ids)
 
     output:
     // pure data for downstream
@@ -60,24 +65,23 @@ process create_metadata_file_for_mbarq_process {
           path("${comparison_name}.mbarq.meta.csv"),
           emit: mbarq_meta_ch
 
-    // log stream (same log_path, updated)
+    // step log
     tuple val(comparison_name),
-          path(log_path),
-          emit: log_ch
+          path("${comparison_name}.create_meta.log.txt"),
+          emit: create_meta_log_ch
 
     script:
     """
-
-    echo "### create_metadata_file_for_mbarq_process for ${comparison_name} ###" >> ${log_path}
-
     create_mbarq_meta_matrix.py \
       --treat-ids ${treat_ids.join(' ')} \
       --ctrl-ids  ${ctrl_ids.join(' ')} \
       --batch batch1 \
       --output ${comparison_name}.mbarq.meta.csv
 
-    # append note to log (optional)
-    echo "created meta: ${comparison_name}.mbarq.meta.csv" >> ${log_path}
+    {
+      echo "### create_metadata_file_for_mbarq_process for ${comparison_name} ###"
+      echo "created meta: ${comparison_name}.mbarq.meta.csv"
+    } > ${comparison_name}.create_meta.log.txt
     """
 }
 
@@ -91,8 +95,7 @@ process filter_barcodes_in_merged_matrices {
     input:
     tuple val(comparison_name),
           path(merged_matrices_path),
-          path(mbarq_meta_path),
-          path(log_path)
+          path(mbarq_meta_path)
     val(filter_config)
 
     output:
@@ -101,19 +104,19 @@ process filter_barcodes_in_merged_matrices {
           path("${comparison_name}.filtered.merged.barcode.matrices.csv"),
           emit: filtered_matrices_ch
 
-    // log stream (updated)
+    // step log
     tuple val(comparison_name),
-          path(log_path),
-          emit: log_ch
+          path("${comparison_name}.filter.log.txt"),
+          emit: filter_log_ch
 
     script:
     """
-
-    echo "### filter_barcodes_in_merged_matrices for ${comparison_name} ###" >> ${log_path}
-
-    echo "lowly_abundant_barcode_cutoff=${filter_config.lowly_abundant_barcode_cutoff}" >> ${log_path}
-    echo "filter_on_what=${filter_config.filter_on_what}" >> ${log_path}
-    echo "remove_all_0_barcodes=${filter_config.remove_all_0_barcodes}" >> ${log_path}
+    {
+      echo "### filter_barcodes_in_merged_matrices for ${comparison_name} ###"
+      echo "lowly_abundant_barcode_cutoff=${filter_config.lowly_abundant_barcode_cutoff}"
+      echo "filter_on_what=${filter_config.filter_on_what}"
+      echo "remove_all_0_barcodes=${filter_config.remove_all_0_barcodes}"
+    } > ${comparison_name}.filter.log.txt
 
     filter_merged_barcode_matrix.r \
         ${merged_matrices_path} \
@@ -123,7 +126,7 @@ process filter_barcodes_in_merged_matrices {
         ${filter_config.remove_all_0_barcodes} \
         ${comparison_name}.filtered.merged.barcode.matrices.csv
 
-    echo "filtered matrix: ${comparison_name}.filtered.merged.barcode.matrices.csv" >> ${log_path}
+    echo "filtered matrix: ${comparison_name}.filtered.merged.barcode.matrices.csv" >> ${comparison_name}.filter.log.txt
     """
 }
 
@@ -136,8 +139,7 @@ process run_mbarq_process {
     input:
     tuple val(comparison_name),
           path(merged_matrices_path),
-          path(mbarq_meta_path),
-          path(log_path)
+          path(mbarq_meta_path)
     val(mbarq_config)
 
     output:
@@ -157,27 +159,29 @@ process run_mbarq_process {
           path("${comparison_name}.filtered.merged.barcode.matrices_Experiment.log"),
           emit: mbarq_experiment_log
 
+    // step log
     tuple val(comparison_name),
-          path(log_path),
-          emit: mbarq_log          
+          path("${comparison_name}.mbarq.log.txt"),
+          emit: mbarq_log_ch
 
     script:
     """
-
-    echo "Running mbarq for comparison ${comparison_name} with normalization method ${mbarq_config.normalization}" >> ${log_path}
+    {
+      echo "### run_mbarq_process for ${comparison_name} ###"
+      echo "norm_method=${mbarq_config.normalization}"
+    } > ${comparison_name}.mbarq.log.txt
 
     mbarq analyze -i ${merged_matrices_path} \
       -s ${mbarq_meta_path} \
-      --treatment_column treatment --baseline control --norm_method ${mbarq_config.normalization}
+      --treatment_column treatment --baseline control \
+      --norm_method ${mbarq_config.normalization}
 
-    echo "mbarq finished for comparison ${comparison_name}" >> ${log_path}
-
-    # ensure log is in the output folder
-    #cp ${log_path} ${comparison_name}.master.log.tx
+    echo "mbarq finished for comparison ${comparison_name}" >> ${comparison_name}.mbarq.log.txt
     """
 }
 
-process plot_volcano_plots_process {
+
+process plot_volcano_plots {
 
     tag { comparison_name }
     label 'r_basic'
@@ -185,8 +189,7 @@ process plot_volcano_plots_process {
 
     input:
     tuple val(comparison_name),
-          path(mbarq_results_path),
-          path(log_path)
+          path(mbarq_results_path)
 
     output:
     tuple val(comparison_name),
@@ -196,18 +199,37 @@ process plot_volcano_plots_process {
     script:
     """
 
-    echo "Computing volcano plot for comparison ${comparison_name}" >> ${log_path}
-
     plot_volcano.r ${mbarq_results_path} ${comparison_name}.volcano_plot.pdf
     touch ${comparison_name}.volcano_plot.pdf
-
-    echo "Volcano plot computation finished for comparison ${comparison_name}" >> ${log_path}
-
-
     """
-
 }
 
+
+process merge_logs {
+
+    tag { comparison_name }
+    // One folder per comparison under mbarq
+    publishDir "${params.outdir}/mbarq/${comparison_name}", mode: 'copy'
+
+    input:
+    tuple val(comparison_name),
+          path(step_logs)
+
+    output:
+    tuple val(comparison_name),
+          path("${comparison_name}.master.log.txt"),
+          emit: master_log_ch
+
+    script:
+    """
+    cat ${step_logs.join(' ')} > ${comparison_name}.master.log.txt
+    """
+}
+
+
+/*
+ * WORKFLOW
+ */
 
 workflow merge_and_analyze {
 
@@ -220,47 +242,55 @@ workflow merge_and_analyze {
   main:
     mr = merge_barcode_matrices_process(comparisons_ch, good_barcodes_ch)
 
-    // treat + ctrl + initial log
+    // treat + ctrl for metadata
     ch_joined = mr.treat_ids_ch
                   .join(mr.ctrl_ids_ch)
-                  .join(mr.log_ch)
-    // => [comparison_name, treat_ids, ctrl_ids, log_path]
+    // => [comparison_name, treat_ids, ctrl_ids]
 
-    meta_step     = create_metadata_file_for_mbarq_process(ch_joined)
-    mbarq_meta_ch = meta_step.mbarq_meta_ch     // (comparison_name, meta_path)
-    log_after_meta = meta_step.log_ch          // (comparison_name, log_path)
+    meta_step      = create_metadata_file_for_mbarq_process(ch_joined)
+    mbarq_meta_ch  = meta_step.mbarq_meta_ch         // (comparison_name, meta_path)
+    create_meta_log_ch = meta_step.create_meta_log_ch
 
-    // merged matrices + meta + log
+    // merged matrices + meta
     merged_with_meta = mr.merged_matrices_ch
                          .join(mbarq_meta_ch)
-                         .join(log_after_meta)
-    // => [comparison_name, merged_matrices_path, meta_path, log_path]
+    // => [comparison_name, merged_matrices_path, meta_path]
 
     filtered_step    = filter_barcodes_in_merged_matrices(
         merged_with_meta,
         filter_config
     )
     filtered_mats_ch = filtered_step.filtered_matrices_ch   // (comparison_name, filtered_matrix)
-    log_after_filter = filtered_step.log_ch                 // (comparison_name, log_path)
+    filter_log_ch    = filtered_step.filter_log_ch
 
-    // join filtered matrix + meta, then add log
+    // join filtered matrix + meta for mbarq
     to_mbarq_data = filtered_mats_ch.join(mbarq_meta_ch)
     // => [comparison_name, filtered_matrix_path, meta_path]
 
-    to_mbarq = to_mbarq_data.join(log_after_filter)
-    // => [comparison_name, filtered_matrix_path, meta_path, log_path]
-
     mbarq_results = run_mbarq_process(
-        to_mbarq,
+        to_mbarq_data,
         mbarq_config
     )
 
-    to_volcano = mbarq_results.mbarq_rra_results
-                  .join(log_after_filter)
+    mbarq_rra_results      = mbarq_results.mbarq_rra_results
+    mbarq_log_ch           = mbarq_results.mbarq_log_ch
 
-    volcano_plots = plot_volcano_plots_process(
+    to_volcano = mbarq_rra_results
+    volcano_plots = plot_volcano_plots(
         to_volcano
     )
+
+    // collect step logs and build master logs
+    ordered_logs = mr.merge_log_ch
+                    .join(create_meta_log_ch)   // [id, merge_log, create_meta_log]
+                    .join(filter_log_ch)        // [id, merge_log, create_meta_log, filter_log]
+                    .join(mbarq_log_ch)         // [id, ..., mbarq_log]
+                    .map { id, merge_log, meta_log, filter_log, mbarq_log ->
+                        tuple(id, [merge_log, meta_log, filter_log, mbarq_log])
+                    }
+
+    master_log_step = merge_logs(ordered_logs)
+    master_log_ch   = master_log_step.master_log_ch
 
   emit:
     mbarq_meta_ch
