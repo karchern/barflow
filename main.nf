@@ -22,7 +22,7 @@ params.twofast2q_folder = params.containsKey('twofast2q_folder') ? params.twofas
 params.mbarq_normalization = params.containsKey('mbarq_normalization') ? params.mbarq_normalization : 'median'
 params.remove_all_0_barcodes = params.containsKey('remove_all_0_barcodes') ? params.remove_all_0_barcodes : false
 params.lowly_abundant_barcode_cutoff = params.containsKey('lowly_abundant_barcode_cutoff') ? params.lowly_abundant_barcode_cutoff : 0
-params.filter_on_what = params.containsKey('filter_on_what') ? params.filter_on_what : 'treatments_and_controls' // allowed values: 'treatments_and_controls', 'treatments_only', 'controls_only'
+params.filter_on_what = params.containsKey('filter_on_what') ? params.filter_on_what : 'both' // allowed values: 'treatments_only', 'controls_only', "both"
 
 def mbarqConfig = [
     normalization                   : params.mbarq_normalization,
@@ -63,7 +63,7 @@ if( params.twofast2q_folder ) {
 
 // sanity check for filter_on_what
 def allowedFilterValues = [
-    'treatments_and_controls',
+    'both',
     'treatments_only',
     'controls_only'
 ] as Set

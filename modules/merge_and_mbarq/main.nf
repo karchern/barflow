@@ -3,6 +3,7 @@ nextflow.enable.dsl=2
 process merge_barcode_matrices_process {
 
     tag { comparison_name }
+    label 'r_basic'
     publishDir "${params.outdir}/merged_barcode_matrices", mode: 'copy'
 
     input:
@@ -84,6 +85,7 @@ process run_mbarq_process {
 process filter_barcodes_in_merged_matrices {
 
     tag { comparison_name }
+    label 'r_basic'
     publishDir "${params.outdir}/filtered_barcode_matrices", mode: 'copy'
 
     input:
@@ -103,32 +105,15 @@ process filter_barcodes_in_merged_matrices {
     echo "filter_on_what=${filter_config.filter_on_what}"
     echo "remove_all_0_barcodes=${filter_config.remove_all_0_barcodes}"
 
-    cp ${merged_matrices_path} ${comparison_name}.filtered.merged.barcode.matrices.csv
+    filter_merged_barcode_matrix.r \
+        ${merged_matrices_path} \
+        ${mbarq_meta_path} \
+        ${filter_config.filter_on_what} \
+        ${filter_config.lowly_abundant_barcode_cutoff} \
+        ${filter_config.remove_all_0_barcodes} \
+        ${comparison_name}.filtered.merged.barcode.matrices.csv
     """
 }
-
-
-
-// process add_locus_tags_to_barcode_matrices_process {
-
-//     tag { comparison_name }
-//     publishDir "${params.outdir}/comparisons", mode: 'copy'
-
-//     input:
-//     tuple val(comparison_name), path(merged_matrices_path)
-//     path good_barcodes_csv_path
-
-//     output:
-//     tuple val(comparison_name), path("${comparison_name}.merged.barcode.matrices.with_locustag.tsv"), emit: merged_matrices_ch
-
-//     script:
-//     """
-//     add_locus_tag_information_to_merged_matrices.r \
-//         --barcode-matrix ${merged_matrices_path} \
-//         --good-barcodes ${good_barcodes_csv_path} \
-//         --output ${comparison_name}.merged.barcode.matrices.with_locustag.tsv
-//     """
-// }
 
 workflow merge_and_analyze {
 
