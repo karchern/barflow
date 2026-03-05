@@ -177,6 +177,37 @@ process run_mbarq_process {
     """
 }
 
+process plot_valcano_plots {
+
+    tag { comparison_name }
+    publishDir "${params.outdir}/mbarq/${comparison_name}", mode: 'copy'
+
+    input:
+    tuple val(comparison_name),
+          path(mbarq_results_path),
+
+    output:
+    tuple val(comparison_name),
+            path("${comparison_name}.volcano_plot.pdf"),
+            emit: volcano_plot_data_ch  
+
+    script:
+    """
+
+    echo "Running mbarq for comparison ${comparison_name} with normalization method ${mbarq_config.normalization}" >> ${log_path}
+
+    mbarq analyze -i ${merged_matrices_path} \
+      -s ${mbarq_meta_path} \
+      --treatment_column treatment --baseline control --norm_method ${mbarq_config.normalization}
+
+    echo "mbarq finished for comparison ${comparison_name}" >> ${log_path}
+
+    # ensure log is in the output folder
+    #cp ${log_path} ${comparison_name}.master.log.tx
+    """
+
+}
+
 
 workflow merge_and_analyze {
 
