@@ -97,7 +97,7 @@ merged_matrices <- do_low_barcode_count_filter(
     lowly_abundant_barcode_cutoff = lowly_abundant_barcode_cutoff
 )
 
-write_tsv(
+write_csv(
     merged_matrices,
     output_path
 )
