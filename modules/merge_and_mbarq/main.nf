@@ -198,9 +198,7 @@ process plot_volcano_plots {
 
     script:
     """
-
-    plot_volcano.r ${mbarq_results_path} ${comparison_name}.volcano_plot.pdf
-    touch ${comparison_name}.volcano_plot.pdf
+    plot_volcano.r ${mbarq_results_path} ${comparison_name} ${comparison_name}.volcano_plot.pdf
     """
 }
 
