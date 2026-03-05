@@ -1,8 +1,6 @@
 #!/usr/bin/env Rscript
 library(tidyverse)
 
-# TODO: Implement logging statement(s) to better understand what's going on in this script? Maybe even with a global log that could be written to a file per comparison.
-
 do_low_barcode_count_filter <- function(merged_matrices, mbarq_meta, filter_on_what, lowly_abundant_barcode_cutoff) {
     # filter_on_what can be "controls" or "treatments" or "both"
     # lowly_abundant_barcode_cutoff is a non-negative integer number

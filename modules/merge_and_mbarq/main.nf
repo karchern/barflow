@@ -177,36 +177,36 @@ process run_mbarq_process {
     """
 }
 
-// process plot_valcano_plots {
+process plot_volcano_plots_process {
 
-//     tag { comparison_name }
-//     publishDir "${params.outdir}/mbarq/${comparison_name}", mode: 'copy'
+    tag { comparison_name }
+    label 'r_basic'
+    publishDir "${params.outdir}/mbarq_analysis/${comparison_name}", mode: 'copy'
 
-//     input:
-//     tuple val(comparison_name),
-//           path(mbarq_results_path),
+    input:
+    tuple val(comparison_name),
+          path(mbarq_results_path),
+          path(log_path)
 
-//     output:
-//     tuple val(comparison_name),
-//             path("${comparison_name}.volcano_plot.pdf"),
-//             emit: volcano_plot_data_ch  
+    output:
+    tuple val(comparison_name),
+          path("${comparison_name}.volcano_plot.pdf"),
+          emit: volcano_plot_data_ch  
 
-//     script:
-//     """
+    script:
+    """
 
-//     echo "Running mbarq for comparison ${comparison_name} with normalization method ${mbarq_config.normalization}" >> ${log_path}
+    echo "Computing volcano plot for comparison ${comparison_name}" >> ${log_path}
 
-//     mbarq analyze -i ${merged_matrices_path} \
-//       -s ${mbarq_meta_path} \
-//       --treatment_column treatment --baseline control --norm_method ${mbarq_config.normalization}
+    plot_volcano.r ${mbarq_results_path} ${comparison_name}.volcano_plot.pdf
+    touch ${comparison_name}.volcano_plot.pdf
 
-//     echo "mbarq finished for comparison ${comparison_name}" >> ${log_path}
+    echo "Volcano plot computation finished for comparison ${comparison_name}" >> ${log_path}
 
-//     # ensure log is in the output folder
-//     #cp ${log_path} ${comparison_name}.master.log.tx
-//     """
 
-// }
+    """
+
+}
 
 
 workflow merge_and_analyze {
@@ -253,6 +253,13 @@ workflow merge_and_analyze {
     mbarq_results = run_mbarq_process(
         to_mbarq,
         mbarq_config
+    )
+
+    to_volcano = mbarq_results.mbarq_rra_results
+                  .join(log_after_filter)
+
+    volcano_plots = plot_volcano_plots_process(
+        to_volcano
     )
 
   emit:
