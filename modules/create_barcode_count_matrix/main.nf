@@ -5,8 +5,7 @@ process extract_barcodes_process {
     publishDir "${params.outdir}/2fast2q", mode: 'copy'
 
     input:
-    tuple val(sample_id), path(fastq_path)
-    path good_barcodes_csv_path
+    tuple val(sample_id), path(fastq_path), path(good_barcodes_csv_path)
 
     output:
     tuple val(sample_id), path("${sample_id}.2fast2q")
@@ -54,10 +53,9 @@ workflow create_counts {
 
   take:
   ch
-  good_barcodes_ch
 
   main:
-  result = extract_barcodes_process(ch, good_barcodes_ch)
+  result = extract_barcodes_process(ch)
 
   emit:
   result

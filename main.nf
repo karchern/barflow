@@ -71,15 +71,9 @@ workflow {
     // load comparisons json
     comparisons = load_json(params.comparisons)
 
-
-
-    // good barcodes
-    good_barcodes_ch = Channel.fromPath(params.good_barcodes_csv)
-                              .map { it }
-                              .first()
-
-
-
+    sample_librarymap = Channel.fromPath(params.sample_librarymap)
+                                      .splitCsv(header:false)
+                                      .map { row -> tuple(row[0], row[1]) }
 
     input_info = createSampleInputChannelAndDecideIfToRun2Fast2Q(
         params.samplesheet,
@@ -89,8 +83,13 @@ workflow {
     def reads_ch   = input_info.reads_ch
     def run_counts = input_info.run_counts
 
+
+
     if( run_counts ) {
-        create_counts(reads_ch, good_barcodes_ch)
+        // join read_ch and sample_librarymap on first field to get 3-element tuples
+        reads_ch = reads_ch
+            .join(sample_librarymap)
+        create_counts(reads_ch)
         all_counts_list_ch = create_counts.out.result.toList()
     }
     else {
@@ -115,12 +114,12 @@ workflow {
         }
         .set { merge_inputs_ch }
 
-    merge_and_analyze(
-        merge_inputs_ch,
-        good_barcodes_ch,
-        filterConfig,
-        mbarqConfig,
-    )
+    // merge_and_analyze(
+    //     merge_inputs_ch,
+    //     good_barcodes_ch,
+    //     filterConfig,
+    //     mbarqConfig,
+    // )
 }
 
 
