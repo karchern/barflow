@@ -34,14 +34,13 @@ return(percent_good_barcodes_detected)
 
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) != 4) {
-    stop("Usage: do_control_based_qc.r <mbarq_results_path> <mbarq_meta_path> <comparison_name> <output_path>")
+if (length(args) != 3) {
+    stop("Usage: do_control_based_qc.r <mbarq_results_path> <mbarq_meta_path> <output_path>")
 }   
 
 mbarq_results_path <- args[1]
 mbarq_meta_path <- args[2]
-comparison_name <- args[3]
-output_path <- args[4]
+output_path <- args[3]
 
 results <- compute_pre_mbarq_qc(
     mbarq_results_path,

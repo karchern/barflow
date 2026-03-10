@@ -16,19 +16,19 @@ process pre_mbarq_qc_process {
     output:
     // step log only
     tuple val(comparison_name),
-          path("${comparison_name}.pre_mbarq_qc.log.txt"),
-          emit: pre_mbarq_qc_log_ch
+          path("${comparison_name}.mbarq_qc.log.txt"),
+          emit: mbarq_qc_log_ch
     
     tuple val(comparison_name),
           path("${comparison_name}.${called_from_where}.mbarq.qc.tsv"),
-          emit: pre_mbarq_qc_data_ch
+          emit: mbarq_qc_data_ch
 
 
 
     script:
     """
-    do_control_based_qc.r  ${merged_matrices_path} ${mbarq_meta_path} ${comparison_name}.pre_mbarq_qc.log.txt "${comparison_name}.${called_from_where}.mbarq.qc.tsv"
-    touch "${comparison_name}.pre_mbarq_qc.log.txt"
+    do_control_based_qc.r  ${merged_matrices_path} ${mbarq_meta_path} "${comparison_name}.${called_from_where}.mbarq.qc.tsv"
+    touch "${comparison_name}.mbarq_qc.log.txt"
     """
 }
 

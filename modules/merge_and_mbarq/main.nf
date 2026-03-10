@@ -318,7 +318,7 @@ workflow merge_and_analyze {
         merged_with_meta,
         "before_barcode_filtering"
     )
-    pre_mbarq_qc_log_ch = pre_qc_step.pre_mbarq_qc_log_ch
+    pre_mbarq_qc_log_ch = pre_qc_step.mbarq_qc_log_ch
 
 
     filtered_step    = filter_barcodes_in_merged_matrices(
@@ -333,6 +333,11 @@ workflow merge_and_analyze {
     to_mbarq_data = filtered_mats_ch.join(mbarq_meta_ch)
     // => [comparison_name, filtered_matrix_path, meta_path]
 
+    post_qc_step = pre_mbarq_qc_process_after_barcode_filtering(
+        to_mbarq_data,
+        "after_barcode_filtering"
+    )
+    post_mbarq_qc_log_ch = post_qc_step.mbarq_qc_log_ch    
 
     mbarq_results = run_mbarq_process(
         to_mbarq_data,
