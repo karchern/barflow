@@ -11,6 +11,10 @@ mbarq_results_path <- args[1]
 comparison_name <- args[2]
 output_path <- args[3]
 
+wrap_len <- 30
+comparison_name_wrapped <- gsub(paste0("(.{", wrap_len, "})"), "\\1\n", comparison_name)
+comparison_name_wrapped <- sub("\n$", "", comparison_name_wrapped)
+
 print(
     paste0(
         "mbarq_results_path: ", mbarq_results_path, "\n",
@@ -30,6 +34,9 @@ all_data <- all_data %>%
     # Mark significance
     sig = if_else(abs(LFC) > 1.5 & FDR < 0.05, "Significant", "Not significant"),
   )
+
+total_number_of_barcodes <- sum(all_data$number_of_barcodes)
+total_number_of_genes <- nrow(all_data)
 
 p <- ggplot(all_data %>% 
          filter(number_of_barcodes > 1),
@@ -52,12 +59,12 @@ p <- ggplot(all_data %>%
 #   scale_x_continuous(breaks = seq(-16, 16, by = 4),
 #                      limits = c(-20, 20)) +
     ggtitle(
-        paste0("Volcano Plot for ", comparison_name)
+        paste0("Volcano Plot for ", comparison_name_wrapped)
     )
 
 ggsave(
     filename = output_path,
     plot = p,
-    width = 6,
-    height = 6
+    width = 4,
+    height = 4
   )
