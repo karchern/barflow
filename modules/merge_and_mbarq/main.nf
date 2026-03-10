@@ -6,6 +6,9 @@ nextflow.enable.dsl=2
  * PROCESSES
  */
 
+ include { pre_mbarq_qc_process as pre_mbarq_qc_process_before_barcode_filtering } from './../utils.nf'
+ include { pre_mbarq_qc_process as pre_mbarq_qc_process_after_barcode_filtering } from './../utils.nf'
+
 
 process merge_barcode_matrices_process {
 
@@ -103,39 +106,7 @@ process create_metadata_file_for_mbarq_process {
 
 
 
-process pre_mbarq_qc_process {
 
-
-    tag { comparison_name }
-    label 'r_basic'
-    publishDir "${params.outdir}/pre_filtering_comparative_qc/${comparison_name}", mode: 'copy'
-
-
-    input:
-    tuple val(comparison_name),
-          path(merged_matrices_path),
-          path(mbarq_meta_path)
-    val(called_from_where)
-
-
-    output:
-    // step log only
-    tuple val(comparison_name),
-          path("${comparison_name}.pre_mbarq_qc.log.txt"),
-          emit: pre_mbarq_qc_log_ch
-    
-    tuple val(comparison_name),
-          path("${comparison_name}.${called_from_where}.mbarq.qc.tsv"),
-          emit: pre_mbarq_qc_data_ch
-
-
-
-    script:
-    """
-    do_control_based_qc.r  ${merged_matrices_path} ${mbarq_meta_path} ${comparison_name}.pre_mbarq_qc.log.txt "${comparison_name}.${called_from_where}.mbarq.qc.tsv"
-    touch "${comparison_name}.pre_mbarq_qc.log.txt"
-    """
-}
 
 
 
@@ -343,7 +314,7 @@ workflow merge_and_analyze {
 
 
     // pre-mbarq QC step (log only)
-    pre_qc_step = pre_mbarq_qc_process(
+    pre_qc_step = pre_mbarq_qc_process_before_barcode_filtering(
         merged_with_meta,
         "before_barcode_filtering"
     )
