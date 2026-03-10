@@ -83,8 +83,7 @@ workflow {
 
     input_info = createSampleInputChannelAndDecideIfToRun2Fast2Q(
         params.samplesheet,
-        params.twofast2q_folder,
-        good_barcodes_ch
+        params.twofast2q_folder
     )
 
     def reads_ch   = input_info.reads_ch

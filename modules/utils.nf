@@ -108,7 +108,7 @@ def buildComparisonList(List<List> tuples, Map comparisons) {
 }
 
 // Decide and build all_counts_list_ch based on params
-def createSampleInputChannelAndDecideIfToRun2Fast2Q(String samplesheet, String twofast2q_folder, good_barcodes_ch) {
+def createSampleInputChannelAndDecideIfToRun2Fast2Q(String samplesheet, String twofast2q_folder) {
 
 
     if ( samplesheet && !twofast2q_folder ) {

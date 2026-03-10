@@ -40,5 +40,4 @@ nextflow run "${project_dir}/main.nf" \
   --comparisons "${project_dir}/test_data/comparisons.json" \
   --singularity true \
   --conda false \
-  -resume \
   -work-dir "${base_outdir}/${RUN_ID}/work"
