@@ -59,13 +59,15 @@ def buildComparisonList(List<List> tuples, Map comparisons) {
     def requiredKeys = [
         'name', 
         'treatments',
-        'controls'
+        'controls',
+        'good_barcodes_file',
     ]
 
     def allowedKeys = [
         'name',
         'treatments',
         'controls',
+        "good_barcodes_file",
         'treatments_negative_selection',
         'controls_negative_selection'
     ] as Set
@@ -99,10 +101,13 @@ def buildComparisonList(List<List> tuples, Map comparisons) {
         def treatIds   = resolveSelectors(treatSel, allIds, treatNegSel)
         def controlIds = resolveSelectors(controlSel, allIds, controlNegSel)
 
+        def good_barcodes_file = cmp.good_barcodes_file
+
         tuple(
             name,
             treatIds.collect   { sid -> [sid, sampleIndex[sid]] },
-            controlIds.collect { sid -> [sid, sampleIndex[sid]] }
+            controlIds.collect { sid -> [sid, sampleIndex[sid]] },
+            good_barcodes_file
         )
     }
 }

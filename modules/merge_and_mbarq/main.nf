@@ -14,8 +14,8 @@ process merge_barcode_matrices_process {
     input:
     tuple val(comparison_name),
           val(treat_ids),   path(treat_paths),
-          val(ctrl_ids),    path(ctrl_paths)
-    path(good_barcodes_csv_path)
+          val(ctrl_ids),    path(ctrl_paths), 
+          path(good_barcodes_file)
 
     output:
     tuple val(comparison_name), val(treat_ids), emit: treat_ids_ch
@@ -35,7 +35,7 @@ process merge_barcode_matrices_process {
     paste <(printf "%s\n" ${ctrl_ids.join(' ')} ) <(printf "%s\n" ${ctrl_paths.join(' ')} ) > controls.tsv
     touch ${comparison_name}.merged.barcode.matrices.tsv
 
-    join_barcode_matrices.r treatments.tsv controls.tsv ${good_barcodes_csv_path} ${comparison_name}.merged.barcode.matrices.csv
+    join_barcode_matrices.r treatments.tsv controls.tsv ${good_barcodes_file} ${comparison_name}.merged.barcode.matrices.csv
 
     {
         echo "### merge_barcode_matrices_process for ${comparison_name} ###"
@@ -233,12 +233,11 @@ workflow merge_and_analyze {
 
   take:
     comparisons_ch
-    good_barcodes_ch
     filter_config
     mbarq_config
 
   main:
-    mr = merge_barcode_matrices_process(comparisons_ch, good_barcodes_ch)
+    mr = merge_barcode_matrices_process(comparisons_ch)
 
     // treat + ctrl for metadata
     ch_joined = mr.treat_ids_ch

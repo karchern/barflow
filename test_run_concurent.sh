@@ -34,11 +34,11 @@ export NXF_CACHE_DIR="${base_outdir}/${RUN_ID}/.nextflow"   # per-run cache
 nextflow run "${project_dir}/main.nf" \
   -profile test_run \
   --test_run true \
-  --samplesheet "${project_dir}/test_data/test_samplesheet.csv" \
-  --sample_librarymap "${project_dir}/test_data/sample_library_map.csv" \
-  --good_barcodes_csv "${project_dir}/test_data/good_barcodes_with_locustag.csv" \
+  --2fast2q_folder /scratch/karcher/barflow_output/blaaaaaaaaaaaaaaaaaaa/2fast2q/ \
+  --sample_goodbarcodesfile_map "${project_dir}/test_data/sample_goodbarcodesfile_map.csv" \
   --outdir "${base_outdir}/${RUN_ID}" \
   --comparisons "${project_dir}/test_data/comparisons.json" \
   --singularity true \
   --conda false \
+  -resume \
   -work-dir "${base_outdir}/${RUN_ID}/work"

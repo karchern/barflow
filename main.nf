@@ -71,7 +71,7 @@ workflow {
     // load comparisons json
     comparisons = load_json(params.comparisons)
 
-    sample_librarymap = Channel.fromPath(params.sample_librarymap)
+    sample_goodbarcodesfile_map = Channel.fromPath(params.sample_goodbarcodesfile_map)
                                       .splitCsv(header:false)
                                       .map { row -> tuple(row[0], row[1]) }
 
@@ -86,9 +86,9 @@ workflow {
 
 
     if( run_counts ) {
-        // join read_ch and sample_librarymap on first field to get 3-element tuples
+        // join read_ch and sample_goodbarcodesfile_map on first field to get 3-element tuples
         reads_ch = reads_ch
-            .join(sample_librarymap)
+            .join(sample_goodbarcodesfile_map)
         create_counts(reads_ch)
         all_counts_list_ch = create_counts.out.result.toList()
     }
@@ -105,21 +105,20 @@ workflow {
 
     comparisons_ch
         .flatMap { it }
-        .map { name, treat_list, ctrl_list ->
+        .map { name, treat_list, ctrl_list, good_barcodes_file ->
             def treat_ids   = treat_list.collect { sid, p -> sid }
             def treat_paths = treat_list.collect { sid, p -> p }
             def ctrl_ids    = ctrl_list.collect { sid, p -> sid }
             def ctrl_paths  = ctrl_list.collect { sid, p -> p }
-            tuple(name, treat_ids, treat_paths, ctrl_ids, ctrl_paths)
+            tuple(name, treat_ids, treat_paths, ctrl_ids, ctrl_paths, good_barcodes_file)
         }
         .set { merge_inputs_ch }
 
-    // merge_and_analyze(
-    //     merge_inputs_ch,
-    //     good_barcodes_ch,
-    //     filterConfig,
-    //     mbarqConfig,
-    // )
+    merge_and_analyze(
+        merge_inputs_ch,
+        filterConfig,
+        mbarqConfig,
+    )
 }
 
 

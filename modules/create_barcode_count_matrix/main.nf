@@ -21,6 +21,8 @@ process extract_barcodes_process {
     cat ${good_barcodes_csv_path}| cut -d "," -f1 > tmp
     paste tmp tmp > good_barcodes_in_stupid_format.csv
 
+    cat ${good_barcodes_csv_path}
+
     # run 2fast2q on that single-file folder
     2fast2q -c \\
     --s input \\
