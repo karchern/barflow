@@ -73,7 +73,7 @@ workflow {
 
     sample_goodbarcodesfile_map = Channel.fromPath(params.sample_goodbarcodesfile_map)
                                       .splitCsv(header:false)
-                                      .map { row -> tuple(row[0], row[1]) }
+                                      .map { row -> tuple(row[0], row[1]) } //TODO: This can be moved into the conditional statement - but I have a pipeline running so don't want to mess things up
 
     input_info = createSampleInputChannelAndDecideIfToRun2Fast2Q(
         params.samplesheet,
