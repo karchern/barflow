@@ -33,7 +33,7 @@ do_low_barcode_count_filter <- function(merged_matrices, mbarq_meta, filter_on_w
             apply(
                 select(., all_of(samples_to_consider)),
                 1,
-                function(x) mean(x) >= lowly_abundant_barcode_cutoff
+                function(x) mean(x) >= as.numeric(lowly_abundant_barcode_cutoff)
             )
         )
     
