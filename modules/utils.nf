@@ -3,7 +3,7 @@ process pre_mbarq_qc_process {
 
     tag { comparison_name }
     label 'r_basic'
-    publishDir "${params.outdir}/pre_filtering_comparative_qc/${comparison_name}", mode: 'copy'
+    publishDir "${params.outdir}/qc_${called_from_where}/${comparison_name}", mode: 'copy'
 
 
     input:
