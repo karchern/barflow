@@ -30,7 +30,7 @@ some/complete/path/to/test_data/test_reads/Sample_control_1.fastq.gz
 some/complete/path/to/test_data/test_reads/Sample_control_2.fastq.gz
 ```
 
-Fastq files can be gzipped or uncompressed, and sample-IDs are dynamically extracte from the full path. The sample_IDs extracted from the paths above would be as below. Make sure your file names do not contain dots, as those could mess up the extraction of the sample_IDs.
+Fastq files can be gzipped or uncompressed, and sample-IDs are dynamically extracte from the full path. The sample_IDs extracted from the paths above would be as below. **Make sure your file names do not contain dots**, as those will mess up the extraction of the sample_IDs.
 
 ```
 Sample_treatment_1
