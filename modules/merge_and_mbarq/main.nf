@@ -28,7 +28,7 @@ process merge_barcode_matrices_process {
     output:
     tuple val(comparison_name), val(treat_ids), emit: treat_ids_ch
     tuple val(comparison_name), val(ctrl_ids), emit: ctrl_ids_ch
-    tuple val(comparison_name), path("${comparison_name}.merged.barcode.matrices.csv"), emit: merged_matrices_ch
+    tuple val(comparison_name), path("${comparison_name}.merged.barcode.matrices.csv.gz"), emit: merged_matrices_ch
     tuple val(comparison_name), path("treatments.tsv"), emit: treatments_ch
     tuple val(comparison_name), path("controls.tsv"), emit: controls_ch
 
@@ -47,6 +47,7 @@ process merge_barcode_matrices_process {
 
 
     join_barcode_matrices.r treatments.tsv controls.tsv ${good_barcodes_file} ${comparison_name}.merged.barcode.matrices.csv
+    gzip -f ${comparison_name}.merged.barcode.matrices.csv
 
 
     {
@@ -128,7 +129,7 @@ process filter_barcodes_in_merged_matrices {
     output:
     // filtered matrix only
     tuple val(comparison_name),
-          path("${comparison_name}.filtered.merged.barcode.matrices.csv"),
+          path("${comparison_name}.filtered.merged.barcode.matrices.csv.gz"),
           emit: filtered_matrices_ch
 
 
@@ -156,8 +157,9 @@ process filter_barcodes_in_merged_matrices {
         ${filter_config.remove_all_0_barcodes} \
         ${comparison_name}.filtered.merged.barcode.matrices.csv
 
+    gzip -f ${comparison_name}.filtered.merged.barcode.matrices.csv
 
-    echo "filtered matrix: ${comparison_name}.filtered.merged.barcode.matrices.csv" >> ${comparison_name}.filter.log.txt
+    echo "filtered matrix: ${comparison_name}.filtered.merged.barcode.matrices.csv.gz" >> ${comparison_name}.filter.log.txt
     """
 }
 
@@ -179,22 +181,22 @@ process run_mbarq_process {
 
     output:
     tuple val(comparison_name),
-          path("${comparison_name}.filtered.merged.barcode.matrices_treated_vs_control.log"),
+          path("${comparison_name}.filtered.merged.barcode.matrices.csv_treated_vs_control.log"),
           emit: mbarq_treated_vs_control_log
 
 
     tuple val(comparison_name),
-          path("${comparison_name}.filtered.merged.barcode.matrices_rra_results.csv"),
+          path("${comparison_name}.filtered.merged.barcode.matrices.csv_rra_results.csv"),
           emit: mbarq_rra_results
 
 
     tuple val(comparison_name),
-          path("${comparison_name}.filtered.merged.barcode.matrices_barcodes_results.csv"),
+          path("${comparison_name}.filtered.merged.barcode.matrices.csv_barcodes_results.csv"),
           emit: mbarq_barcodes_results
 
 
     tuple val(comparison_name),
-          path("${comparison_name}.filtered.merged.barcode.matrices_Experiment.log"),
+          path("${comparison_name}.filtered.merged.barcode.matrices.csv_Experiment.log"),
           emit: mbarq_experiment_log
 
 
@@ -211,6 +213,8 @@ process run_mbarq_process {
       echo "norm_method=${mbarq_config.normalization}"
     } > ${comparison_name}.mbarq.log.txt
 
+    # Decompress into a new file (Nextflow staged file may be a symlink)
+    #gunzip -c "${merged_matrices_path}" > "${merged_matrices_path}.decompressed" # Not necessary since mbarq can read in gzipped files directly
 
     mbarq analyze -i ${merged_matrices_path} \
       -s ${mbarq_meta_path} \
