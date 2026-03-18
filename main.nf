@@ -96,6 +96,27 @@ workflow {
         all_counts_list_ch = reads_ch.toList()
     }
 
+    if( params.stop_after_barcode_extraction as boolean ) {
+        // force materialization so that create_counts (or its cache) is actually used
+        all_counts_list_ch
+            .view { tuples ->
+                log.warn """
+                ================================
+                STOP AFTER BARCODE EXTRACTION
+                ================================
+                Parameter: --stop_after_barcode_extraction true
+
+                Barcode extraction and count matrix generation have completed.
+                No downstream merging or mbarq analysis will be performed.
+                Disable this behavior by omitting the parameter or setting:
+                    --stop_after_barcode_extraction false
+                ================================
+                """.stripIndent()
+            }
+    // just return from workflow body: pipeline ends successfully
+    return
+    }
+
     // downstream as before
     all_counts_list_ch
         .map { tuples ->
