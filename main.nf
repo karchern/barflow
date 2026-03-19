@@ -68,9 +68,6 @@ if( !allowedFilterValues.contains(params.filter_on_what as String) ) {
 
 workflow {
 
-    // load comparisons json
-    comparisons = load_json(params.comparisons)
-
     sample_goodbarcodesfile_map = Channel.fromPath(params.sample_goodbarcodesfile_map)
                                       .splitCsv(header:false)
                                       .map { row -> tuple(row[0], row[1]) } //TODO: This can be moved into the conditional statement - but I have a pipeline running so don't want to mess things up
@@ -116,6 +113,9 @@ workflow {
     // just return from workflow body: pipeline ends successfully
     return
     }
+
+    // load comparisons json
+    comparisons = load_json(params.comparisons)
 
     // downstream as before
     all_counts_list_ch
