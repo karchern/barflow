@@ -22,8 +22,6 @@ process extract_barcodes_process {
     cat ${good_barcodes_csv_path}| cut -d "," -f1 > tmp
     paste tmp tmp > good_barcodes_in_stupid_format.csv
 
-    cat ${good_barcodes_csv_path}
-
     echo ${lib_cfg.upstream}
     echo ${lib_cfg.downstream}
 
