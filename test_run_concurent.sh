@@ -35,7 +35,7 @@ nextflow run "${project_dir}/main.nf" \
   -profile test_run \
   --test_run true \
   --samplesheet "${project_dir}/test_data/test_samplesheet.csv" \
-  --sample_goodbarcodesfile_map "${project_dir}/test_data/sample_goodbarcodesfile_map.csv" \
+  --sample_goodbarcodes_library_map "${project_dir}/test_data/sample_goodbarcodesfile_map.csv" \
   --outdir "${base_outdir}/${RUN_ID}" \
   --comparisons "${project_dir}/test_data/comparisons.json" \
   --singularity true \

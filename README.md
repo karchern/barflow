@@ -10,7 +10,7 @@ This pipeline assumes you have already characterized your input library and have
 
 Specifically, as input, we need:
 - Per-sample single-end fastq files corresponding to invididual samples/replicates that were bar-. Specified via parameter `--samplesheet` (see below).
-- If you do this, you also need to supply `--sample_goodbarcodes_map`: a 2-column csv with the first column containing the sample_id (matching what is in samplesheet) and the second column the path to the file containing barcodes and their genomic locus tag (see below)
+- If you do this, you also need to supply `--sample_goodbarcodes_library_map`: a 3-column csv with the first column containing the sample_id (matching what is in samplesheet), the second column the path to the file containing barcodes and their genomic locus tag (see below) and the third column containing the library name. The library name is used to find the correct `upstream` and `downstream` sequences in the nextflow config - it is crucial that they match.
   - Alternatively, you can supply a folder containing 2fast2q output files, one per sample. These can be precomputed using this pipeline (in the first step, this pipeline runs 2fast2q on all samples supplied in `--samplesheet`), or elsewhere. Files should be called `${sampleID}.2fast2q`, and path to the folder containing these files should be specified using `--2fast2q_folder`. This is mutually exclusive with `--samplesheet`, and an error will be thrown if both are supplied at the same time.
 - File specifying which samples are supposed to be treated as 'control' or 'treatment' for the differential barcode analysis as well as the barcodes to be analyzed as well as their locus tag (same files as supplied to `--sample_goodbarcodes_map`) via parameter `--comparisons` (see below).
 
@@ -39,9 +39,6 @@ Sample_control_1
 Sample_control_2
 ```
 
-Make sure to correctly set the upstream- and downstream nucleotide sequences, either by changing them in `nextflow.config` or, alternatively, by
-setting them on te command line via parameters `--upstream_seq` and `--downstream_seq`.
-
 ### Map between samples and their libraries
 
 Each sample is based on a specific barcoded transposon library, and each of those has a set of 'good' barcodes that can be defined in various ways. If one wants to run 2fast2q, one needs to also supply a set of barcodes for 2fast2q to look for. To that end, supply a 2-column csv with the first column containing the sample_id (matching what is in samplesheet) and the second column the path to the file containing barcodes and their genomic locus tag (see below). See section `Reliable barcodes`.
@@ -49,11 +46,13 @@ Each sample is based on a specific barcoded transposon library, and each of thos
 For example:
 
 ```
-Sample_treatment_1,some/complete/path/to/test_data/good_barcodes_with_locustag.csv
-Sample_treatment_2,some/complete/path/to/test_data/good_barcodes_with_locustag.csv
-Sample_control_1,some/complete/path/to/test_data/good_barcodes_with_locustag.csv
-Sample_control_2,some/complete/path/to/test_data/good_barcodes_with_locustag.csv
+Sample_treatment_1,some/complete/path/to/test_data/good_barcodes_with_locustag.csv,library_A
+Sample_treatment_2,some/complete/path/to/test_data/good_barcodes_with_locustag.csv,library_A
+Sample_control_1,some/complete/path/to/test_data/good_barcodes_with_locustag.csv,library_A
+Sample_control_2,some/complete/path/to/test_data/good_barcodes_with_locustag.csv,library_A
 ```
+
+As described above, `library_A` needs to be found in the corresponding `params.library_seqs` in the config so that the correct upstream- and downstream sequences of the transpson can be found
 
 ### Alternative to Per-sample fastq files - Preprocessed 2fast2q output
 

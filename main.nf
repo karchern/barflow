@@ -68,9 +68,9 @@ if( !allowedFilterValues.contains(params.filter_on_what as String) ) {
 
 workflow {
 
-    sample_goodbarcodesfile_map = Channel.fromPath(params.sample_goodbarcodesfile_map)
+    sample_goodbarcodes_library_map = Channel.fromPath(params.sample_goodbarcodes_library_map)
                                       .splitCsv(header:false)
-                                      .map { row -> tuple(row[0], row[1]) } //TODO: This can be moved into the conditional statement - but I have a pipeline running so don't want to mess things up
+                                      .map { row -> tuple(row[0], row[1], row[2]) } //TODO: This can be moved into the conditional statement - but I have a pipeline running so don't want to mess things up
 
     input_info = createSampleInputChannelAndDecideIfToRun2Fast2Q(
         params.samplesheet,
@@ -83,9 +83,9 @@ workflow {
 
 
     if( run_counts ) {
-        // join read_ch and sample_goodbarcodesfile_map on first field to get 3-element tuples
+        // join read_ch and sample_goodbarcodes_library_map on first field to get 3-element tuples
         reads_ch = reads_ch
-            .join(sample_goodbarcodesfile_map)
+            .join(sample_goodbarcodes_library_map)
         create_counts(reads_ch)
         all_counts_list_ch = create_counts.out.result.toList()
     }

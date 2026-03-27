@@ -5,7 +5,8 @@ process extract_barcodes_process {
     publishDir "${params.outdir}/2fast2q", mode: 'copy'
 
     input:
-    tuple val(sample_id), path(fastq_path), path(good_barcodes_csv_path)
+    tuple val(sample_id), path(fastq_path), path(good_barcodes_csv_path), val(library), val(lib_cfg)
+    
 
     output:
     tuple val(sample_id), path("${sample_id}.2fast2q")
@@ -23,14 +24,17 @@ process extract_barcodes_process {
 
     cat ${good_barcodes_csv_path}
 
+    echo ${lib_cfg.upstream}
+    echo ${lib_cfg.downstream}
+
     # run 2fast2q on that single-file folder
     2fast2q -c \\
     --s input \\
     --g good_barcodes_in_stupid_format.csv \\
     --o "${sample_id}.2fast2q" \\
     --ph 1 \\
-    --us "${params.upstream_seq}" \\
-    --ds "${params.downstream_seq}" \\
+    --us "${lib_cfg.upstream}" \\
+    --ds "${lib_cfg.downstream}" \\
     --msu 3 \\
     --msd 3 \\
     --qsu 1 \\
@@ -53,12 +57,28 @@ process extract_barcodes_process {
 
 workflow create_counts {
 
-  take:
-  ch
+    take:
+    ch   // emits: [ sample_id, fastq_path, good_barcodes_csv_path, library ]
 
-  main:
-  result = extract_barcodes_process(ch)
+    main:
+    validated = ch.map { sample_id, fastq, barcodes, library ->
 
-  emit:
-  result
+        def lib_cfg = params.library_seqs[ library ]
+
+        if( lib_cfg == null ) {
+            // fail early with a clear message
+            def known = params.library_seqs.keySet().sort().join(', ')
+            throw new IllegalArgumentException(
+                "Unknown library '${library}'. Known libraries: ${known}"
+            )
+        }
+
+        // append lib_cfg as an extra field in the tuple
+        [ sample_id, fastq, barcodes, library, lib_cfg ]
+    }
+    
+    result = extract_barcodes_process(validated)
+
+    emit:
+    result
 }
