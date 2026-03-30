@@ -73,15 +73,15 @@ if( !allowedFilterValues.contains(params.filter_on_what as String) ) {
 
 // Workflow helper: load and validate comparisons, then build the derived channels
 // Returns a list: [comparisons_ch, comparisons_ch, comparisons_status_ch]
-def check_and_filter_comparisons(all_counts_list_ch, comparisons) {
+def check_and_filter_comparisons(input_list, comparisons) {
     // build comparisons channel (each element is a list of comparison tuples)
-    def comparisons_ch = all_counts_list_ch
+    def comparisons_built_ch = input_list
         .map { tuples ->
             buildComparisonList(tuples, comparisons)
         }
 
     // prepare inputs for merging: (name, treat_ids, treat_paths, ctrl_ids, ctrl_paths, good_barcodes_file)
-    def merge_inputs_ch = comparisons_ch
+    def fitness_analysis_input_ch = comparisons_built_ch
         .flatMap { it }
         .map { name, treat_list, ctrl_list, good_barcodes_file, status, status_detail ->
             def treat_ids   = treat_list.collect { sid, p -> sid }
@@ -92,14 +92,14 @@ def check_and_filter_comparisons(all_counts_list_ch, comparisons) {
         }
 
     // build a list of comparison status tuples and materialize to a single channel (toList)
-    def comparisons_status_ch = comparisons_ch
+    def comparisons_status_list = comparisons_built_ch
         .flatMap { it }
         .map { name, treat_list, ctrl_list, good_barcodes_file, status, status_detail ->
             tuple(name, status, status_detail)
         }
         .toList()
 
-    return [comparisons_ch, merge_inputs_ch, comparisons_status_ch]
+    return [fitness_analysis_input_ch, comparisons_status_list]
 }
 
 workflow {
@@ -123,15 +123,15 @@ workflow {
         reads_ch = reads_ch
             .join(sample_goodbarcodes_library_map)
         barcode_counter(reads_ch)
-        all_counts_list_ch = barcode_counter.out.result.toList()
+        all_counts_list = barcode_counter.out.result.toList()
     }
     else {
-        all_counts_list_ch = reads_ch.toList()
+        all_counts_list = reads_ch.toList()
     }
 
     if( params.stop_after_barcode_extraction as boolean ) {
         // force materialization so that barcode_counter (or its cache) is actually used
-        all_counts_list_ch
+        all_counts_list
             .view { tuples ->
                 log.warn """
                 ================================
@@ -152,21 +152,17 @@ workflow {
 
     comparisons = load_json(params.comparisons)
 
-    def comps = check_and_filter_comparisons(all_counts_list_ch, comparisons)
-    def _ = comps[0]
-    def merge_inputs_ch = comps[1]
-    def comparisons_status_ch = comps[2]
+    def comps = check_and_filter_comparisons(all_counts_list, comparisons)
+    //def _ = comps[0]
+    def fitness_analysis_input_ch = comps[0]
+    def comparisons_status_list = comps[1]
 
     // check_and_filter_comparisons will check which comparisons have all their samples passing QC, and filter out the ones that don't. 
     // It will also build a list of comparison status tuples that we can materialize to a channel and publish as a tsv file.
     // Before barseq qc, all comparisons should be present (no filtering based on barseq QC yet), but we can still check their status and also need build the list of comparison status tuples.
-    get_comparison_status_before_barseq_qc(comparisons_status_ch, "before_barseq_qc")        
+    get_comparison_status_before_barseq_qc(comparisons_status_list, "before_barseq_qc")        
 
-    barseq_qc(
-        all_counts_list_ch
-        .flatMap { it }, 
-    params.minimum_read_sum_for_qc
-    )
+    barseq_qc(all_counts_list.flatMap { it }, params.minimum_read_sum_for_qc)
 
     // merge barcode_count_sample_metrics
     barseq_qc.out.
@@ -176,14 +172,14 @@ workflow {
         .set { metrics_paths }
     
     // Based on the barseq_qc output, build a channel of sample_ids that passed QC. We will use this to filter the comparisons.
-    sample_qcs_PASSED_CH = barseq_qc.out
+    sample_ids_passed_ch = barseq_qc.out
         .filter { sample_id, metrics_path, qc_passed -> qc_passed.text.trim() == '1' }
         .map { sample_id, metrics_path, qc_passed -> sample_id }
         .map { sid -> tuple(sid) }
 
-    all_counts_list_PASSED_ch = all_counts_list_ch
+    all_counts_PASSED_ch = all_counts_list
     .flatMap { it }
-    .join(sample_qcs_PASSED_CH)
+    .join(sample_ids_passed_ch)
 
     // Publish merged BarSeq sample QC metrics
     collate_barseq_qc_results(metrics_paths)
@@ -191,14 +187,14 @@ workflow {
     // After barseq qc and corresponding sample filtering, we need to check and filter the comparisons based on which samples passed QC.
     // If a comparison has some samples removed, we keep the comparison but log the missing samples in the comparison status. 
     // If all samples of a comparison are removed, we filter out the comparison entirely.
-    def comps_post_filter = check_and_filter_comparisons(all_counts_list_PASSED_ch.toList(), comparisons)
-    def merge_inputs_post_filter_ch = comps_post_filter[1]
-    def comparisons_status_post_filter_ch = comps_post_filter[2]
+    def comps_post_filter = check_and_filter_comparisons(all_counts_PASSED_ch.toList(), comparisons)
+    //def _ = comps_post_filter[0]
+    def fitness_analysis_input_post_filter_ch = comps_post_filter[0]
+    def comparisons_status_post_filter_list = comps_post_filter[1]
 
-    get_comparison_status_after_barseq_qc(comparisons_status_post_filter_ch, "after_barseq_qc")
+    get_comparison_status_after_barseq_qc(comparisons_status_post_filter_list, "after_barseq_qc")
 
-    // TODO: Add some more logging statements
-    filter_ch_comparison_post_filter = comparisons_status_post_filter_ch
+    comparisons_status_post_filter_PASSED_list = comparisons_status_post_filter_list
         .flatMap { it }
         .filter { name, status, detail -> status != 'ALL_SAMPLES_MISSING' } 
         .map { name, status, detail -> name }
@@ -206,24 +202,20 @@ workflow {
     // Attention: Comparisons with completely missing samples have already been filtered out in filter_ch_comparison_post_filter
     // so this join removes comparisons that have all samples missing, but keeps comparisons that have at least some samples passing QC.
     // This is important to consider downstream.
-    merge_inputs_post_filtered_PASSED_ch = merge_inputs_post_filter_ch
-        .join(filter_ch_comparison_post_filter)
-
-    //
-    // SUMMARY METRICS FOR print_summary_table
-    //
+    fitness_analysis_input_post_filter_PASSED_ch = fitness_analysis_input_post_filter_ch
+        .join(comparisons_status_post_filter_PASSED_list)
 
     print_summary_table_p(
-        all_counts_list_ch,
-        sample_qcs_PASSED_CH,
-        comparisons_status_ch,
-        filter_ch_comparison_post_filter
+        all_counts_list,
+        sample_ids_passed_ch,
+        comparisons_status_list,
+        comparisons_status_post_filter_PASSED_list
     )
         
     // only run fitness analysis on samples that passed QC.
     // adapt comparisons accordingly (see above)
     fitness_analysis(
-        merge_inputs_post_filtered_PASSED_ch,
+        fitness_analysis_input_post_filter_PASSED_ch,
         filterConfig,
         mbarqConfig,
     )
