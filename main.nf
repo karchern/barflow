@@ -8,6 +8,8 @@ include {
     buildComparisonList
     createSampleInputChannelAndDecideIfToRun2Fast2Q
     print_summary_table_p
+    barseq_qc
+    collate_barseq_qc_results
 } from './modules/utils.nf'
 include { fitness_analysis } from './modules/fitness_analysis'
 include { get_comparison_status as get_comparison_status_before_barseq_qc } from './modules/get_comparison_status'
@@ -234,50 +236,5 @@ def load_json(
     def jsonData = new JsonSlurper().parseText(jsonFile.text)
 
     return jsonData
-}
-
-
-process barseq_qc {
-
-    label 'python_basic'
-
-    input:
-    tuple val(sample_id), path(counts_path)
-    val(minimum_read_sum_for_qc)
-
-    output:
-    tuple val(sample_id), path("${sample_id}.barcode_metrics.csv"), path("${sample_id}.passed_qc.txt"), emit: metrics
-
-    """
-    barseq_qc.py \
-        --sample_id ${sample_id} \
-        --input ${counts_path} \
-        --output ${sample_id}.barcode_metrics.csv \
-        --output_passed ${sample_id}.passed_qc.txt \
-        --min_read_sum_for_qc ${minimum_read_sum_for_qc}
-    
-    """
-}
-
-process collate_barseq_qc_results {
-    
-    label 'python_basic'
-
-    publishDir "${params.outdir}/logs/", mode: 'copy', overwrite: true
-
-    input:
-    path metrics_file_paths
-
-    output:
-    path("all_samples.barcode_metrics.tsv"), emit: sample_wise_qc_metrics
-
-    script:
-    """
-    echo -e "sample_id,total_reads,n_barcodes,max_count,mean_count,median_count" > all_samples.barcode_metrics.tsv
-    for f in *.csv; do
-        tail -n +2 "\$f" >> all_samples.barcode_metrics.tsv
-    done
-    """
-
 }
 
