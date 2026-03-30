@@ -205,6 +205,33 @@ workflow {
     // This is important to consider downstream.
     merge_inputs_post_filtered_PASSED_ch = merge_inputs_post_filter_ch
         .join(filter_ch_comparison_post_filter)
+
+    //
+    // SUMMARY METRICS FOR print_summary_table
+    //
+
+    // 1) total samples (pre-QC) from all_counts_list_ch (toList value channel)
+    def total_samples_ch = all_counts_list_ch.map { all_samples_list ->
+        all_samples_list.size()
+    }
+
+    // 2) samples after BarSeq QC
+    def samples_after_qc_ch = sample_qcs_PASSED_CH.count()
+
+    // 3) comparisons before filtering – use comparisons JSON length
+    def comps_before_ch = comparisons_status_ch.map {
+        x -> x.size()
+    }
+
+    // 4) comparisons after filtering – number of comparison names that survived
+    def comps_after_ch = filter_ch_comparison_post_filter.count()
+
+    print_summary_table(
+        total_samples_ch,
+        samples_after_qc_ch,
+        comps_before_ch,
+        comps_after_ch
+    )    
         
     // only run fitness analysis on samples that passed QC.
     // adapt comparisons accordingly (see above)
@@ -214,56 +241,6 @@ workflow {
         mbarqConfig,
     )
 
-    all_counts_list_ch
-        .map { all_samples_list ->
-
-            // 1) Total samples (pre-QC)
-            def n_total_samples = all_samples_list.size()
-
-            // 2) Samples after BarSeq QC (count entries with passed_qc == '1')
-            def n_after_qc = sample_qcs_PASSED_CH
-                .count()
-                .getVal() as int
-
-            // 3) Comparisons before filtering:
-            //    you have the raw comparisons JSON as `comparisons`
-            //    assume it's a list of comparison objects
-            def n_comps_before = (comparisons instanceof List) ? comparisons.size() : 0
-
-            // 4) Comparisons after filtering:
-            //    comparisons_status_post_filter_ch is a toList() channel of [name, status, detail]
-            def n_comps_after = comparisons_status_post_filter_ch
-                .map { list_of_tuples -> list_of_tuples.size() }
-                .getVal() as int
-
-            [
-                total_samples          : n_total_samples,
-                samples_after_barseq   : n_after_qc,
-                comps_before_filter    : n_comps_before,
-                comps_after_filter     : n_comps_after
-            ]
-        }
-        .subscribe { summary ->
-
-            def h1 = "Metric"
-            def h2 = "Number"
-
-            def lines = []
-            lines << "============================================"
-            lines << "              Pre-mbarq numbers            "
-            lines << "============================================"
-            lines << String.format("| %-28s | %8s |", h1, h2)
-            lines << "--------------------------------------------"
-            lines << String.format("| %-28s | %8d |", "BarSeq samples before QC",          summary.total_samples as int)
-            lines << String.format("| %-28s | %8d |", "BarSeq samples after QC",           summary.samples_after_barseq as int)
-            lines << String.format("| %-28s | %8d |", "Comparisons before filtering",      summary.comps_before_filter as int)
-            lines << String.format("| %-28s | %8d |", "Comparisons after filtering",       summary.comps_after_filter as int)
-            lines << "============================================"
-
-            lines.each { line -> println(line) }  // or log.info(line)
-            // IMPORTANT: do not return anything from this closure
-
-    }
 }
 
 def load_json(
@@ -319,4 +296,29 @@ process collate_barseq_qc_results {
     done
     """
 
+}
+
+process print_summary_table {
+    //debug true   // Crucial to make it print to stdout
+    cache false // force rerun
+    
+    input:
+    val total_samples
+    val samples_after_qc
+    val comps_before
+    val comps_after
+
+    exec:
+    println """
+============================================
+              Pre-mbarq numbers            
+============================================
+| ${"Metric".padRight(28)} | ${"Number".padLeft(8)} |
+--------------------------------------------
+| ${"BarSeq samples before QC".padRight(28)} | ${String.valueOf(total_samples).padLeft(8)} |
+| ${"BarSeq samples after QC".padRight(28)} | ${String.valueOf(samples_after_qc).padLeft(8)} |
+| ${"Comparisons before filtering".padRight(28)} | ${String.valueOf(comps_before).padLeft(8)} |
+| ${"Comparisons after filtering".padRight(28)} | ${String.valueOf(comps_after).padLeft(8)} |
+============================================
+""".stripIndent()
 }
