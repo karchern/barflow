@@ -1,8 +1,10 @@
 nextflow.enable.dsl=2
 
-process extract_barcodes_process {
-    tag { sample_id }
+process count_barcodes {
+    //tag { sample_id }
+    label 'fast2q'
     publishDir "${params.outdir}/2fast2q", mode: 'copy'
+    errorStrategy 'terminate' // This must absolutely be terminate, as otherwise logging/tracing of samples is fucked
 
     input:
     tuple val(sample_id), path(fastq_path), path(good_barcodes_csv_path), val(library), val(lib_cfg)
@@ -51,11 +53,11 @@ process extract_barcodes_process {
 }
 
 // workflow create_counts (ch, params) {
-//     ch.map { it } | extract_barcodes_process
+//     ch.map { it } | count_barcodes
 //     return sample_counts_ch
 // }
 
-workflow create_counts {
+workflow barcode_counter {
 
     take:
     ch   // emits: [ sample_id, fastq_path, good_barcodes_csv_path, library ]
@@ -77,7 +79,7 @@ workflow create_counts {
         [ sample_id, fastq, barcodes, library, lib_cfg ]
     }
     
-    result = extract_barcodes_process(validated)
+    result = count_barcodes(validated)
 
     emit:
     result

@@ -1,7 +1,7 @@
-name: myenv
+name: python
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bioconda::fast2q
+  - python=3.12
   - pandas

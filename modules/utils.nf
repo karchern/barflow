@@ -122,8 +122,6 @@ def buildComparisonList(List<List> tuples, Map comparisons) {
             )
         }
 
-
-
         def name        = cmp.name as String
 
         def treatSel    = asStringList(cmp.treatments)
@@ -135,14 +133,60 @@ def buildComparisonList(List<List> tuples, Map comparisons) {
         def treatIds   = resolveSelectors(treatSel, allIds, treatNegSel)
         def controlIds = resolveSelectors(controlSel, allIds, controlNegSel)
 
-        def good_barcodes_file = cmp.good_barcodes_file
+        def treatNegIds = resolveSelectors(treatNegSel, allIds)
+        def controlNegIds = resolveSelectors(controlNegSel, allIds)
 
+        def good_barcodes_file = cmp.good_barcodes_file
+        
+        // compute missing IDs vs what was requested
+        def requestedTreatIds   = treatSel
+        def requestedControlIds = controlSel
+
+        def requestedTreatNegIds   = treatNegSel
+        def requestedControlNegIds = controlNegSel
+
+        def missingTreat   = (requestedTreatIds - treatIds) as List
+        def missingControl = (requestedControlIds - controlIds) as List
+
+        // Remove treatNegSel from missingTreat 
+        missingTreat = missingTreat - treatNegSel
+        // Remove controlNegSel from missingControl
+        missingControl = missingControl - controlNegSel
+
+        def status
+        def status_detail
+
+        if( !missingTreat && !missingControl) {
+            status        = 'OK'
+            status_detail = ''
+        }
+        // if ALL requested treatments are missing, OR if ALL requested controls are missing, then we consider the comparison as FAILED (because it can't be run at all)
+        else if( (requestedTreatIds && !treatIds) || (requestedControlIds && !controlIds) ) {
+            status = 'ALL_SAMPLES_MISSING'
+            def parts = []
+            if( missingTreat )
+                parts << "treatments: ${missingTreat.join(', ')}"
+            if( missingControl )
+                parts << "controls: ${missingControl.join(', ')}"
+            status_detail = parts.join(' | ')
+        }
+        else {
+            status = 'SOME_SAMPLES_MISSING'
+            def parts = []
+            if( missingTreat )
+                parts << "treatments: ${missingTreat.join(', ')}"
+            if( missingControl )
+                parts << "controls: ${missingControl.join(', ')}"
+            status_detail = parts.join(' | ')
+        }
         tuple(
             name,
             treatIds.collect   { sid -> [sid, sampleIndex[sid]] },
             controlIds.collect { sid -> [sid, sampleIndex[sid]] },
-            good_barcodes_file
-        )
+            good_barcodes_file,
+            status,
+            status_detail
+        )        
     }
 }
 
@@ -152,13 +196,22 @@ def createSampleInputChannelAndDecideIfToRun2Fast2Q(String samplesheet, String t
 
     if ( samplesheet && !twofast2q_folder ) {
 
+        // def reads_ch = Channel
+        //     .fromPath(samplesheet)
+        //     .splitCsv(header:false)
+        //     .map { row ->
+        //         def filename = file(row[0]).name.replaceFirst(/(?i)\.(fastq|fq)(\.gz)?|_sequence\.txt\.gz$/, '')
+        //         tuple(filename, row[0])
+        //     }
+
         def reads_ch = Channel
             .fromPath(samplesheet)
             .splitCsv(header:false)
             .map { row ->
-                def filename = file(row[0]).name.replaceFirst(/(?i)\.(fastq|fq)(\.gz)?|_sequence\.txt\.gz$/, '')
-                tuple(filename, row[0])
-            }
+                def reads_file = file(row[0])
+                def filename = reads_file.name.replaceFirst(/(?i)(\.(fastq|fq)(\.gz)?|_sequence\.txt\.gz)$/, '')
+                tuple(filename, reads_file)
+            }        
 
 
         return [ reads_ch: reads_ch, run_counts: true ]
