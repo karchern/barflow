@@ -5,11 +5,13 @@ import groovy.json.JsonSlurper
 
 include { barcode_counter } from './modules/count_barcodes'
 include {
-    buildComparisonList
-    createSampleInputChannelAndDecideIfToRun2Fast2Q
     print_summary_table_p
     barseq_qc
     collate_barseq_qc_results
+} from './modules/pre_mbarq_qc'
+include {
+    buildComparisonList
+    createSampleInputChannelAndDecideIfToRun2Fast2Q
 } from './modules/utils'
 include { fitness_analysis } from './modules/fitness_analysis'
 include { get_comparison_status as get_comparison_status_before_barseq_qc } from './modules/get_comparison_status'

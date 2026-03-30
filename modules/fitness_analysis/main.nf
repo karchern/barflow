@@ -6,8 +6,8 @@ nextflow.enable.dsl=2
  * PROCESSES
  */
 
- include { pre_mbarq_qc_process as pre_barcode_filt_qc } from './../utils'
- include { pre_mbarq_qc_process as post_barcode_filt_qc } from './../utils'
+ include { pre_mbarq_qc_process as pre_barcode_filt_qc } from './../pre_mbarq_qc'
+ include { pre_mbarq_qc_process as post_barcode_filt_qc } from './../pre_mbarq_qc'
 
 
 process merge_barcode_matrix {
