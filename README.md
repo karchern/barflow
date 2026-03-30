@@ -174,6 +174,9 @@ Next steps you mentioned:
 - Define comparison config format for downstream branches
 - Add tests and example data
 
+# Steps to take after analysis
+- Look at comparsions_status/comparisons_status.tsv and ensure that all encoded comparisons (from `comparisons.json`) could be realized (it compares requested samples against the ones found in the 2fast2q output folder)
+
 # Quirks
 
 - The comparisons defined in the `comparison.json` are based on the entries of the `samplesheet.txt`. What this means is that only what is in the `samplesheet.txt` can be handed over to the differential abundance computation. It is therefore crucial that you 
