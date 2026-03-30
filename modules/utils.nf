@@ -235,7 +235,7 @@ def createSampleInputChannelAndDecideIfToRun2Fast2Q(String samplesheet, String t
 
 }
 
-workflow print_summary_table {
+workflow print_summary_table_p {
 
     take:
     all_counts_list_ch
@@ -256,7 +256,7 @@ workflow print_summary_table {
 
     def comps_after_ch = filter_ch_comparison_post_filter.count()
 
-    PRINT_SUMMARY_TABLE(
+    print_summary_table(
         total_samples_ch,
         samples_after_qc_ch,
         comps_before_ch,
@@ -264,7 +264,7 @@ workflow print_summary_table {
     )
 }
 
-process PRINT_SUMMARY_TABLE {
+process print_summary_table {
 
     cache false
     debug true

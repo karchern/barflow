@@ -7,7 +7,7 @@ include { barcode_counter } from './modules/count_barcodes'
 include {
     buildComparisonList
     createSampleInputChannelAndDecideIfToRun2Fast2Q
-    print_summary_table
+    print_summary_table_p
 } from './modules/utils.nf'
 include { fitness_analysis } from './modules/fitness_analysis'
 include { get_comparison_status as get_comparison_status_before_barseq_qc } from './modules/get_comparison_status'
@@ -209,7 +209,7 @@ workflow {
     // SUMMARY METRICS FOR print_summary_table
     //
 
-    print_summary_table(
+    print_summary_table_p(
         all_counts_list_ch,
         sample_qcs_PASSED_CH,
         comparisons_status_ch,
