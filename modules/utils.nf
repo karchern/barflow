@@ -234,3 +234,58 @@ def createSampleInputChannelAndDecideIfToRun2Fast2Q(String samplesheet, String t
     }
 
 }
+
+workflow print_summary_table {
+
+    take:
+    all_counts_list_ch
+    sample_qcs_PASSED_CH
+    comparisons_status_ch
+    filter_ch_comparison_post_filter
+
+    main:
+    def total_samples_ch = all_counts_list_ch.map { all_samples_list ->
+        all_samples_list.size()
+    }
+
+    def samples_after_qc_ch = sample_qcs_PASSED_CH.count()
+
+    def comps_before_ch = comparisons_status_ch.map { x ->
+        x.size()
+    }
+
+    def comps_after_ch = filter_ch_comparison_post_filter.count()
+
+    PRINT_SUMMARY_TABLE(
+        total_samples_ch,
+        samples_after_qc_ch,
+        comps_before_ch,
+        comps_after_ch
+    )
+}
+
+process PRINT_SUMMARY_TABLE {
+
+    cache false
+    debug true
+
+    input:
+    val total_samples
+    val samples_after_qc
+    val comps_before
+    val comps_after
+
+    exec:
+    println """
+        ============================================
+                    Pre-mbarq numbers
+        ============================================
+        | ${"Metric".padRight(28)} | ${"Number".padLeft(8)} |
+        --------------------------------------------
+        | ${"BarSeq samples before QC".padRight(28)} | ${String.valueOf(total_samples).padLeft(8)} |
+        | ${"BarSeq samples after QC".padRight(28)} | ${String.valueOf(samples_after_qc).padLeft(8)} |
+        | ${"Comparisons before filtering".padRight(28)} | ${String.valueOf(comps_before).padLeft(8)} |
+        | ${"Comparisons after filtering".padRight(28)} | ${String.valueOf(comps_after).padLeft(8)} |
+        ============================================
+        """.stripIndent()
+}

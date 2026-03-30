@@ -5,10 +5,9 @@ import groovy.json.JsonSlurper
 
 include { barcode_counter } from './modules/count_barcodes'
 include {
-    buildSampleIndex
-    resolveSelectors
     buildComparisonList
     createSampleInputChannelAndDecideIfToRun2Fast2Q
+    print_summary_table
 } from './modules/utils.nf'
 include { fitness_analysis } from './modules/fitness_analysis'
 include { get_comparison_status as get_comparison_status_before_barseq_qc } from './modules/get_comparison_status'
@@ -210,28 +209,12 @@ workflow {
     // SUMMARY METRICS FOR print_summary_table
     //
 
-    // 1) total samples (pre-QC) from all_counts_list_ch (toList value channel)
-    def total_samples_ch = all_counts_list_ch.map { all_samples_list ->
-        all_samples_list.size()
-    }
-
-    // 2) samples after BarSeq QC
-    def samples_after_qc_ch = sample_qcs_PASSED_CH.count()
-
-    // 3) comparisons before filtering – use comparisons JSON length
-    def comps_before_ch = comparisons_status_ch.map {
-        x -> x.size()
-    }
-
-    // 4) comparisons after filtering – number of comparison names that survived
-    def comps_after_ch = filter_ch_comparison_post_filter.count()
-
     print_summary_table(
-        total_samples_ch,
-        samples_after_qc_ch,
-        comps_before_ch,
-        comps_after_ch
-    )    
+        all_counts_list_ch,
+        sample_qcs_PASSED_CH,
+        comparisons_status_ch,
+        filter_ch_comparison_post_filter
+    )
         
     // only run fitness analysis on samples that passed QC.
     // adapt comparisons accordingly (see above)
@@ -298,27 +281,3 @@ process collate_barseq_qc_results {
 
 }
 
-process print_summary_table {
-    //debug true   // Crucial to make it print to stdout
-    cache false // force rerun
-    
-    input:
-    val total_samples
-    val samples_after_qc
-    val comps_before
-    val comps_after
-
-    exec:
-    println """
-============================================
-              Pre-mbarq numbers            
-============================================
-| ${"Metric".padRight(28)} | ${"Number".padLeft(8)} |
---------------------------------------------
-| ${"BarSeq samples before QC".padRight(28)} | ${String.valueOf(total_samples).padLeft(8)} |
-| ${"BarSeq samples after QC".padRight(28)} | ${String.valueOf(samples_after_qc).padLeft(8)} |
-| ${"Comparisons before filtering".padRight(28)} | ${String.valueOf(comps_before).padLeft(8)} |
-| ${"Comparisons after filtering".padRight(28)} | ${String.valueOf(comps_after).padLeft(8)} |
-============================================
-""".stripIndent()
-}
