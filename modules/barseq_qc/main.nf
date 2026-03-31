@@ -51,18 +51,18 @@ workflow barseq_qc_wf {
     main:
 
     def comparisons = load_json(params.comparisons)
-    all_counts_list = all_counts.toList() // materialize to list for multiple passes
 
-    def comps = check_and_validate_comparisons_post_qc(all_counts_list, comparisons)
+    // Pass CHANNELs (not materialized Lists) into helpers and processes that expect channels
+    // TODO: check_and_validate_comparisons_post_qc only works with toList() - figure out why and fix. And same for the second call after filtering below.
+    def comps = check_and_validate_comparisons_post_qc(all_counts.toList(), comparisons)
     def fitness_analysis_input_ch = comps[0]
     def comparisons_status_list = comps[1]
 
-    // check_and_validate_comparisons_post_qc will check which comparisons have all their samples passing QC, and filter out the ones that don't. 
-    // It will also build a list of comparison status tuples that we can materialize to a channel and publish as a tsv file.
-    // Before barseq qc, all comparisons should be present (no filtering based on barseq QC yet), but we can still check their status and also need build the list of comparison status tuples.
+    // Pre-QC comparison validation (materialized list is acceptable here)
     comparison_validation_log_pre_qc = validate_comparisons_pre_qc(comparisons_status_list, "before_barseq_qc")        
 
-    barseq_qc(all_counts_list.flatMap { it }, params.minimum_read_sum_for_qc)
+    // Run per-sample BarSeq QC using the channel of counts
+    barseq_qc(all_counts, params.minimum_read_sum_for_qc)
 
     // merge barcode_count_sample_metrics
     barseq_qc.out.
@@ -77,15 +77,12 @@ workflow barseq_qc_wf {
         .map { sample_id, metrics_path, qc_passed -> sample_id }
         .map { sid -> tuple(sid) }
 
-    all_counts_PASSED_ch = all_counts_list
-    .flatMap { it }
-    .join(sample_ids_passed_ch)
+    // Join the original counts CHANNEL with the passed-samples channel to get only passing samples
+    all_counts_PASSED_ch = all_counts.join(sample_ids_passed_ch)
 
     // After barseq qc and corresponding sample filtering, we need to check and filter the comparisons based on which samples passed QC.
-    // If a comparison has some samples removed, we keep the comparison but log the missing samples in the comparison status. 
-    // If all samples of a comparison are removed, we filter out the comparison entirely.
+    // Pass the CHANNEL into the comparison-check helper (it expects channel operations)
     def comps_post_filter = check_and_validate_comparisons_post_qc(all_counts_PASSED_ch.toList(), comparisons)
-    //def _ = comps_post_filter[0]
     def fitness_analysis_input_post_filter_ch = comps_post_filter[0]
     def comparisons_status_post_filter_list = comps_post_filter[1]
 
@@ -106,7 +103,7 @@ workflow barseq_qc_wf {
         .join(comparisons_status_post_filter_PASSED_list)
 
     print_summary_table_p(
-        all_counts_list,
+        all_counts,
         sample_ids_passed_ch,
         comparisons_status_list,
         comparisons_status_post_filter_PASSED_list
@@ -124,13 +121,13 @@ workflow barseq_qc_wf {
 workflow print_summary_table_p {
 
     take:
-    all_counts_list_ch
+    all_counts_ch
     sample_qcs_PASSED_CH
     comparisons_status_ch
     filter_ch_comparison_post_filter
 
     main:
-    def total_samples_ch = all_counts_list_ch.map { all_samples_list ->
+    def total_samples_ch = all_counts_ch.toList().map { all_samples_list ->
         all_samples_list.size()
     }
 
