@@ -8,9 +8,10 @@ include {
 
 // Workflow helper: load and validate comparisons, then build the derived channels
 // Returns a list: [comparisons_ch, comparisons_ch, comparisons_status_ch]
-def check_and_validate_comparisons_post_qc(input_list, comparisons) {
+def check_and_validate_comparisons_post_qc(input_channel, comparisons) {
     // build comparisons channel (each element is a list of comparison tuples)
-    def comparisons_built_ch = input_list
+    def comparisons_built_ch = input_channel.
+        toList()
         .map { tuples ->
             buildComparisonList(tuples, comparisons)
         }
@@ -54,7 +55,7 @@ workflow barseq_qc_wf {
 
     // Pass CHANNELs (not materialized Lists) into helpers and processes that expect channels
     // TODO: check_and_validate_comparisons_post_qc only works with toList() - figure out why and fix. And same for the second call after filtering below.
-    def comps = check_and_validate_comparisons_post_qc(all_counts.toList(), comparisons)
+    def comps = check_and_validate_comparisons_post_qc(all_counts, comparisons)
     def fitness_analysis_input_ch = comps[0]
     def comparisons_status_list = comps[1]
 
@@ -82,7 +83,7 @@ workflow barseq_qc_wf {
 
     // After barseq qc and corresponding sample filtering, we need to check and filter the comparisons based on which samples passed QC.
     // Pass the CHANNEL into the comparison-check helper (it expects channel operations)
-    def comps_post_filter = check_and_validate_comparisons_post_qc(all_counts_PASSED_ch.toList(), comparisons)
+    def comps_post_filter = check_and_validate_comparisons_post_qc(all_counts_PASSED_ch, comparisons)
     def fitness_analysis_input_post_filter_ch = comps_post_filter[0]
     def comparisons_status_post_filter_list = comps_post_filter[1]
 
