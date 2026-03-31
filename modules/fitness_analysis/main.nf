@@ -15,7 +15,7 @@ process merge_barcode_matrices {
 
     tag { comparison_name }
     label 'r_basic'
-    publishDir "${params.outdir}/merged_barcode_matrices", mode: 'copy'
+    publishDir "${params.outdir}/barcode_matrices", mode: 'copy'
 
 
     input:
@@ -116,7 +116,7 @@ process filter_barcodes {
 
     tag { comparison_name }
     label 'r_basic'
-    publishDir "${params.outdir}/filtered_barcode_matrices", mode: 'copy'
+    publishDir "${params.outdir}/barcode_matrices_filtered", mode: 'copy'
 
 
     input:
@@ -169,7 +169,7 @@ process mbarq {
 
 
     tag { comparison_name }
-    publishDir "${params.outdir}/mbarq/${comparison_name}", mode: 'copy'
+    publishDir "${params.outdir}/mbarq_results/${comparison_name}", mode: 'copy'
 
 
     input:
