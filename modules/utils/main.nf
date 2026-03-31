@@ -224,3 +224,26 @@ process get_comparison_status {
     printf '%b\n' "${lines}" >> comparisons_status_${type}.tsv
     """
 }
+
+def stop_after_barcode_extraction_and_warn(all_counts) {
+    // materialize channel into list and emit a single view message when the flag is set
+    if( params.stop_after_barcode_extraction as boolean ) {
+        all_counts.toList()
+            .view { tuples ->
+                log.warn """
+                ================================
+                STOP AFTER BARCODE EXTRACTION
+                ================================
+                Parameter: --stop_after_barcode_extraction true
+
+                Barcode extraction and count matrix generation have completed.
+                No downstream merging or mbarq analysis will be performed.
+                Disable this behavior by omitting the parameter or setting:
+                    --stop_after_barcode_extraction false
+                ================================
+                """.stripIndent()
+            }
+        return true
+    }
+    return false
+}

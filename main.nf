@@ -5,6 +5,7 @@ include { barcode_counter } from './modules/count_barcodes'
 include { barseq_qc_wf } from './modules/barseq_qc'
 include {
     createSampleInputChannelAndDecideIfToRun2Fast2Q
+    stop_after_barcode_extraction_and_warn
 } from './modules/utils'
 include { fitness_analysis } from './modules/fitness_analysis'
 
@@ -87,26 +88,10 @@ workflow {
         all_counts = reads_ch
     }
 
-    if( params.stop_after_barcode_extraction as boolean ) {
-        // force materialization so that barcode_counter (or its cache) is actually used
-        // TODO: Check if the toList here is necessary when you're done with refactoring
-        all_counts.toList() 
-            .view { tuples ->
-                log.warn """
-                ================================
-                STOP AFTER BARCODE EXTRACTION
-                ================================
-                Parameter: --stop_after_barcode_extraction true
-
-                Barcode extraction and count matrix generation have completed.
-                No downstream merging or mbarq analysis will be performed.
-                Disable this behavior by omitting the parameter or setting:
-                    --stop_after_barcode_extraction false
-                ================================
-                """.stripIndent()
-            }
-    // just return from workflow body: pipeline ends successfully
-    return
+    // use utility helper to handle the "stop after barcode extraction" behavior
+    if( stop_after_barcode_extraction_and_warn(all_counts) ) {
+        // just return from workflow body: pipeline ends successfully
+        return
     }
 
     barseq_qc_wf(
