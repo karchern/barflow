@@ -1,14 +1,14 @@
 import groovy.json.JsonSlurper
 
-include { get_comparison_status as validate_comparisons } from './../utils'
-include { get_comparison_status as filter_comparisons } from './../utils'
+include { get_comparison_status as validate_comparisons_pre_qc } from './../utils'
+include { get_comparison_status as validate_comparisons_post_qc } from './../utils'
 include {
     buildComparisonList
 } from './../utils'
 
 // Workflow helper: load and validate comparisons, then build the derived channels
 // Returns a list: [comparisons_ch, comparisons_ch, comparisons_status_ch]
-def check_and_filter_comparisons(input_list, comparisons) {
+def check_and_validate_comparisons_post_qc(input_list, comparisons) {
     // build comparisons channel (each element is a list of comparison tuples)
     def comparisons_built_ch = input_list
         .map { tuples ->
@@ -53,14 +53,14 @@ workflow barseq_qc_wf {
     def comparisons = load_json(params.comparisons)
     all_counts_list = all_counts.toList() // materialize to list for multiple passes
 
-    def comps = check_and_filter_comparisons(all_counts_list, comparisons)
+    def comps = check_and_validate_comparisons_post_qc(all_counts_list, comparisons)
     def fitness_analysis_input_ch = comps[0]
     def comparisons_status_list = comps[1]
 
-    // check_and_filter_comparisons will check which comparisons have all their samples passing QC, and filter out the ones that don't. 
+    // check_and_validate_comparisons_post_qc will check which comparisons have all their samples passing QC, and filter out the ones that don't. 
     // It will also build a list of comparison status tuples that we can materialize to a channel and publish as a tsv file.
     // Before barseq qc, all comparisons should be present (no filtering based on barseq QC yet), but we can still check their status and also need build the list of comparison status tuples.
-    validate_comparisons(comparisons_status_list, "before_barseq_qc")        
+    validate_comparisons_pre_qc(comparisons_status_list, "before_barseq_qc")        
 
     barseq_qc(all_counts_list.flatMap { it }, params.minimum_read_sum_for_qc)
 
@@ -84,12 +84,12 @@ workflow barseq_qc_wf {
     // After barseq qc and corresponding sample filtering, we need to check and filter the comparisons based on which samples passed QC.
     // If a comparison has some samples removed, we keep the comparison but log the missing samples in the comparison status. 
     // If all samples of a comparison are removed, we filter out the comparison entirely.
-    def comps_post_filter = check_and_filter_comparisons(all_counts_PASSED_ch.toList(), comparisons)
+    def comps_post_filter = check_and_validate_comparisons_post_qc(all_counts_PASSED_ch.toList(), comparisons)
     //def _ = comps_post_filter[0]
     def fitness_analysis_input_post_filter_ch = comps_post_filter[0]
     def comparisons_status_post_filter_list = comps_post_filter[1]
 
-    filter_comparisons(comparisons_status_post_filter_list, "after_barseq_qc")
+    validate_comparisons_post_qc(comparisons_status_post_filter_list, "after_barseq_qc")
 
     // Publish merged BarSeq sample QC metrics
     collate_barseq_qc_results(metrics_paths)

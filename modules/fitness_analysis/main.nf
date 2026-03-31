@@ -10,7 +10,7 @@ nextflow.enable.dsl=2
  include { pre_mbarq_qc_process as post_barcode_filt_qc } from './../pre_mbarq_qc'
 
 
-process merge_barcode_matrix {
+process merge_barcode_matrices {
 
 
     tag { comparison_name }
@@ -51,7 +51,7 @@ process merge_barcode_matrix {
 
 
     {
-        echo "### merge_barcode_matrix for ${comparison_name} ###"
+        echo "### merge_barcode_matrices for ${comparison_name} ###"
         echo "comparison_name=${comparison_name}"
         echo "treatments.tsv:"
         cat treatments.tsv
@@ -63,7 +63,7 @@ process merge_barcode_matrix {
 
 
 
-process make_mbarq_metadata {
+process generate_mbarq_meta {
 
 
     tag { comparison_name }
@@ -99,7 +99,7 @@ process make_mbarq_metadata {
 
 
     {
-      echo "### make_mbarq_metadata for ${comparison_name} ###"
+      echo "### generate_mbarq_meta for ${comparison_name} ###"
       echo "created meta: ${comparison_name}.mbarq.meta.csv"
     } > ${comparison_name}.create_meta.log.txt
     """
@@ -297,7 +297,7 @@ workflow fitness_analysis {
 
 
   main:
-    mr = merge_barcode_matrix(comparisons_ch)
+    mr = merge_barcode_matrices(comparisons_ch)
 
 
     // treat + ctrl for metadata
@@ -306,7 +306,7 @@ workflow fitness_analysis {
     // => [comparison_name, treat_ids, ctrl_ids]
 
 
-    meta_step      = make_mbarq_metadata(ch_joined)
+    meta_step      = generate_mbarq_meta(ch_joined)
     mbarq_meta_ch  = meta_step.mbarq_meta_ch         // (comparison_name, meta_path)
     create_meta_log_ch = meta_step.create_meta_log_ch
 
