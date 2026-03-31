@@ -220,7 +220,7 @@ process get_comparison_status {
     }.join('\\n')
 
     """
-    printf '%s\n' "comparison_name\tstatus\tstatus_detail" > comparisons_status_${type}.tsv
+    printf '%s\n' "comparison\tstatus\tstatus_detail" > comparisons_status_${type}.tsv
     printf '%b\n' "${lines}" >> comparisons_status_${type}.tsv
     """
 }

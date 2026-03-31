@@ -106,5 +106,79 @@ workflow {
         mbarqConfig,
     )
 
+    ch_pre_mbarq = fitness_analysis.out.pre_mbarq_qc_data_aggregated_ch
+    ch_post_mbarq = fitness_analysis.out.post_mbarq_qc_data_aggregated_ch
+
+    res = ch_pre_mbarq.join(ch_post_mbarq)
+               .map { name, pre_m, post_m -> tuple(name, pre_m, post_m) }
+
+    create_master_comparison_log_proc(
+        res
+    )
+
+    concat_mbarq_qc_results(
+        create_master_comparison_log_proc.out.master_log_ch.collect()
+    )
+
+    get_final_master_log(
+            barseq_qc_wf.out.comparison_validation_log_pre_qc,
+            barseq_qc_wf.out.comparison_validation_log_post_qc,
+            concat_mbarq_qc_results.out.all_comparisons_master_log
+    )
+
 }
 
+process create_master_comparison_log_proc {
+    tag { comparison_name }
+    label 'r_basic'
+    //publishDir "${params.outdir}/comparison_master_logs", mode: 'copy', overwrite: true
+
+    input:
+    tuple val(comparison_name), path(pre_mbarq_log), path(post_mbarq_log)
+
+    output:
+    path("${comparison_name}.master_log.tsv"), emit: master_log_ch
+
+    script:
+    """
+    join_master_logs.R "${comparison_name}" "${pre_mbarq_log}" "${post_mbarq_log}" "${comparison_name}.master_log.tsv"
+    """
+}
+
+process concat_mbarq_qc_results {
+    label 'r_basic'
+    publishDir "${params.outdir}/", mode: 'copy', overwrite: true
+
+    input:
+    path master_files
+
+    output:
+    path("all_comparisons.master_log.tsv"), emit: all_comparisons_master_log
+
+    script:
+    """
+    # Get column names from the first file (assuming all files have the same columns)
+    header=\$(head -n 1 ${master_files[0]})
+    echo "\$header" > all_comparisons.master_log.tsv
+    # Concatenate the rest files, skipping the header of each subsequent file
+    for f in ${master_files.join(' ')}; do cat \${f} | tail -n 1 >> all_comparisons.master_log.tsv; done
+    """
+}
+
+process get_final_master_log {
+    label 'r_basic'
+    publishDir "${params.outdir}/", mode: 'copy', overwrite: true
+
+    input:
+    path pre_qc_logs
+    path post_qc_logs
+    path barseq_qc_logs
+
+    output:
+    path("final_master_log.tsv")
+
+    script:
+    """
+    join_master_logs_2.R "${pre_qc_logs}" "${post_qc_logs}" "${barseq_qc_logs}" "final_master_log.tsv"
+    """
+}

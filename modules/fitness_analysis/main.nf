@@ -322,6 +322,7 @@ workflow fitness_analysis {
         merged_with_meta,
         "before_barcode_filtering"
     )
+    pre_mbarq_qc_data_aggregated_ch = pre_qc_step.mbarq_qc_data_aggregated_ch
     pre_mbarq_qc_log_ch = pre_qc_step.mbarq_qc_log_ch
 
 
@@ -341,7 +342,8 @@ workflow fitness_analysis {
         to_mbarq_data,
         "after_barcode_filtering"
     )
-    post_mbarq_qc_log_ch = post_qc_step.mbarq_qc_log_ch    
+    post_mbarq_qc_data_aggregated_ch = post_qc_step.mbarq_qc_data_aggregated_ch    
+    post_mbarq_qc_log_ch = pre_qc_step.mbarq_qc_log_ch
 
     mbarq_results = mbarq(
         to_mbarq_data,
@@ -376,4 +378,6 @@ workflow fitness_analysis {
 
   emit:
     mbarq_meta_ch
+    pre_mbarq_qc_data_aggregated_ch
+    post_mbarq_qc_data_aggregated_ch
 }
