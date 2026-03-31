@@ -60,7 +60,7 @@ workflow barseq_qc_wf {
     // check_and_validate_comparisons_post_qc will check which comparisons have all their samples passing QC, and filter out the ones that don't. 
     // It will also build a list of comparison status tuples that we can materialize to a channel and publish as a tsv file.
     // Before barseq qc, all comparisons should be present (no filtering based on barseq QC yet), but we can still check their status and also need build the list of comparison status tuples.
-    validate_comparisons_pre_qc(comparisons_status_list, "before_barseq_qc")        
+    comparison_validation_log_pre_qc = validate_comparisons_pre_qc(comparisons_status_list, "before_barseq_qc")        
 
     barseq_qc(all_counts_list.flatMap { it }, params.minimum_read_sum_for_qc)
 
@@ -89,7 +89,7 @@ workflow barseq_qc_wf {
     def fitness_analysis_input_post_filter_ch = comps_post_filter[0]
     def comparisons_status_post_filter_list = comps_post_filter[1]
 
-    validate_comparisons_post_qc(comparisons_status_post_filter_list, "after_barseq_qc")
+    comparison_validation_log_post_qc = validate_comparisons_post_qc(comparisons_status_post_filter_list, "after_barseq_qc")
 
     // Publish merged BarSeq sample QC metrics
     collate_barseq_qc_results(metrics_paths)
@@ -114,6 +114,9 @@ workflow barseq_qc_wf {
 
     emit:
     fitness_analysis_input
+    comparison_validation_log_pre_qc
+    comparison_validation_log_post_qc
+
 }
 
 
