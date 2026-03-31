@@ -154,7 +154,7 @@ process collate_barseq_qc_results {
     
     label 'python_basic'
 
-    publishDir "${params.outdir}/logs/", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/barseq_qc/", mode: 'copy', overwrite: true
 
     input:
     path metrics_file_paths
