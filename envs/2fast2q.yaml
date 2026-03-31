@@ -1,0 +1,7 @@
+name: myenv
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - bioconda::fast2q
+  - pandas

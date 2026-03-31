@@ -6,16 +6,16 @@ nextflow.enable.dsl=2
  * PROCESSES
  */
 
- include { pre_mbarq_qc_process as pre_mbarq_qc_process_before_barcode_filtering } from './../utils.nf'
- include { pre_mbarq_qc_process as pre_mbarq_qc_process_after_barcode_filtering } from './../utils.nf'
+ include { pre_mbarq_qc_process as pre_barcode_filt_qc } from './../pre_mbarq_qc'
+ include { pre_mbarq_qc_process as post_barcode_filt_qc } from './../pre_mbarq_qc'
 
 
-process merge_barcode_matrices_process {
+process merge_barcode_matrices {
 
 
     tag { comparison_name }
     label 'r_basic'
-    publishDir "${params.outdir}/merged_barcode_matrices", mode: 'copy'
+    publishDir "${params.outdir}/barcode_matrices", mode: 'copy'
 
 
     input:
@@ -51,7 +51,7 @@ process merge_barcode_matrices_process {
 
 
     {
-        echo "### merge_barcode_matrices_process for ${comparison_name} ###"
+        echo "### merge_barcode_matrices for ${comparison_name} ###"
         echo "comparison_name=${comparison_name}"
         echo "treatments.tsv:"
         cat treatments.tsv
@@ -63,7 +63,7 @@ process merge_barcode_matrices_process {
 
 
 
-process create_metadata_file_for_mbarq_process {
+process generate_mbarq_meta {
 
 
     tag { comparison_name }
@@ -99,7 +99,7 @@ process create_metadata_file_for_mbarq_process {
 
 
     {
-      echo "### create_metadata_file_for_mbarq_process for ${comparison_name} ###"
+      echo "### generate_mbarq_meta for ${comparison_name} ###"
       echo "created meta: ${comparison_name}.mbarq.meta.csv"
     } > ${comparison_name}.create_meta.log.txt
     """
@@ -111,12 +111,12 @@ process create_metadata_file_for_mbarq_process {
 
 
 
-process filter_barcodes_in_merged_matrices {
+process filter_barcodes {
 
 
     tag { comparison_name }
     label 'r_basic'
-    publishDir "${params.outdir}/filtered_barcode_matrices", mode: 'copy'
+    publishDir "${params.outdir}/barcode_matrices_filtered", mode: 'copy'
 
 
     input:
@@ -142,7 +142,7 @@ process filter_barcodes_in_merged_matrices {
     script:
     """
     {
-      echo "### filter_barcodes_in_merged_matrices for ${comparison_name} ###"
+      echo "### filter_barcodes for ${comparison_name} ###"
       echo "lowly_abundant_barcode_cutoff=${filter_config.lowly_abundant_barcode_cutoff}"
       echo "filter_on_what=${filter_config.filter_on_what}"
       echo "remove_all_0_barcodes=${filter_config.remove_all_0_barcodes}"
@@ -165,11 +165,11 @@ process filter_barcodes_in_merged_matrices {
 
 
 
-process run_mbarq_process {
+process mbarq {
 
 
     tag { comparison_name }
-    publishDir "${params.outdir}/mbarq/${comparison_name}", mode: 'copy'
+    publishDir "${params.outdir}/mbarq_results/${comparison_name}", mode: 'copy'
 
 
     input:
@@ -209,7 +209,7 @@ process run_mbarq_process {
     script:
     """
     {
-      echo "### run_mbarq_process for ${comparison_name} ###"
+      echo "### mbarq for ${comparison_name} ###"
       echo "norm_method=${mbarq_config.normalization}"
     } > ${comparison_name}.mbarq.log.txt
 
@@ -287,7 +287,7 @@ process merge_logs {
  */
 
 
-workflow merge_and_analyze {
+workflow fitness_analysis {
 
 
   take:
@@ -297,7 +297,7 @@ workflow merge_and_analyze {
 
 
   main:
-    mr = merge_barcode_matrices_process(comparisons_ch)
+    mr = merge_barcode_matrices(comparisons_ch)
 
 
     // treat + ctrl for metadata
@@ -306,7 +306,7 @@ workflow merge_and_analyze {
     // => [comparison_name, treat_ids, ctrl_ids]
 
 
-    meta_step      = create_metadata_file_for_mbarq_process(ch_joined)
+    meta_step      = generate_mbarq_meta(ch_joined)
     mbarq_meta_ch  = meta_step.mbarq_meta_ch         // (comparison_name, meta_path)
     create_meta_log_ch = meta_step.create_meta_log_ch
 
@@ -318,14 +318,15 @@ workflow merge_and_analyze {
 
 
     // pre-mbarq QC step (log only)
-    pre_qc_step = pre_mbarq_qc_process_before_barcode_filtering(
+    pre_qc_step = pre_barcode_filt_qc(
         merged_with_meta,
         "before_barcode_filtering"
     )
+    pre_mbarq_qc_data_aggregated_ch = pre_qc_step.mbarq_qc_data_aggregated_ch
     pre_mbarq_qc_log_ch = pre_qc_step.mbarq_qc_log_ch
 
 
-    filtered_step    = filter_barcodes_in_merged_matrices(
+    filtered_step    = filter_barcodes(
         merged_with_meta,
         filter_config
     )
@@ -337,13 +338,14 @@ workflow merge_and_analyze {
     to_mbarq_data = filtered_mats_ch.join(mbarq_meta_ch)
     // => [comparison_name, filtered_matrix_path, meta_path]
 
-    post_qc_step = pre_mbarq_qc_process_after_barcode_filtering(
+    post_qc_step = post_barcode_filt_qc(
         to_mbarq_data,
         "after_barcode_filtering"
     )
-    post_mbarq_qc_log_ch = post_qc_step.mbarq_qc_log_ch    
+    post_mbarq_qc_data_aggregated_ch = post_qc_step.mbarq_qc_data_aggregated_ch    
+    post_mbarq_qc_log_ch = pre_qc_step.mbarq_qc_log_ch
 
-    mbarq_results = run_mbarq_process(
+    mbarq_results = mbarq(
         to_mbarq_data,
         mbarq_config
     )
@@ -376,4 +378,6 @@ workflow merge_and_analyze {
 
   emit:
     mbarq_meta_ch
+    pre_mbarq_qc_data_aggregated_ch
+    post_mbarq_qc_data_aggregated_ch
 }

@@ -1,37 +1,3 @@
-process pre_mbarq_qc_process {
-
-
-    tag { comparison_name }
-    label 'r_basic'
-    publishDir "${params.outdir}/qc_${called_from_where}/${comparison_name}", mode: 'copy'
-
-
-    input:
-    tuple val(comparison_name),
-          path(merged_matrices_path),
-          path(mbarq_meta_path)
-    val(called_from_where)
-
-
-    output:
-    // step log only
-    tuple val(comparison_name),
-          path("${comparison_name}.mbarq_qc.log.txt"),
-          emit: mbarq_qc_log_ch
-    
-    tuple val(comparison_name),
-          path("${comparison_name}.${called_from_where}.mbarq.qc.tsv"),
-          emit: mbarq_qc_data_ch
-
-
-
-    script:
-    """
-    do_control_based_qc.r  ${merged_matrices_path} ${mbarq_meta_path} "${comparison_name}.${called_from_where}.mbarq.qc.tsv"
-    touch "${comparison_name}.mbarq_qc.log.txt"
-    """
-}
-
 def buildSampleIndex(List tuples) {
     // tuples are [sample_id, Path]
     def idx = [:]
@@ -122,8 +88,6 @@ def buildComparisonList(List<List> tuples, Map comparisons) {
             )
         }
 
-
-
         def name        = cmp.name as String
 
         def treatSel    = asStringList(cmp.treatments)
@@ -135,14 +99,60 @@ def buildComparisonList(List<List> tuples, Map comparisons) {
         def treatIds   = resolveSelectors(treatSel, allIds, treatNegSel)
         def controlIds = resolveSelectors(controlSel, allIds, controlNegSel)
 
-        def good_barcodes_file = cmp.good_barcodes_file
+        def treatNegIds = resolveSelectors(treatNegSel, allIds)
+        def controlNegIds = resolveSelectors(controlNegSel, allIds)
 
+        def good_barcodes_file = cmp.good_barcodes_file
+        
+        // compute missing IDs vs what was requested
+        def requestedTreatIds   = treatSel
+        def requestedControlIds = controlSel
+
+        def requestedTreatNegIds   = treatNegSel
+        def requestedControlNegIds = controlNegSel
+
+        def missingTreat   = (requestedTreatIds - treatIds) as List
+        def missingControl = (requestedControlIds - controlIds) as List
+
+        // Remove treatNegSel from missingTreat 
+        missingTreat = missingTreat - treatNegSel
+        // Remove controlNegSel from missingControl
+        missingControl = missingControl - controlNegSel
+
+        def status
+        def status_detail
+
+        if( !missingTreat && !missingControl) {
+            status        = 'OK'
+            status_detail = ''
+        }
+        // if ALL requested treatments are missing, OR if ALL requested controls are missing, then we consider the comparison as FAILED (because it can't be run at all)
+        else if( (requestedTreatIds && !treatIds) || (requestedControlIds && !controlIds) ) {
+            status = 'ALL_SAMPLES_MISSING'
+            def parts = []
+            if( missingTreat )
+                parts << "treatments: ${missingTreat.join(', ')}"
+            if( missingControl )
+                parts << "controls: ${missingControl.join(', ')}"
+            status_detail = parts.join(' | ')
+        }
+        else {
+            status = 'SOME_SAMPLES_MISSING'
+            def parts = []
+            if( missingTreat )
+                parts << "treatments: ${missingTreat.join(', ')}"
+            if( missingControl )
+                parts << "controls: ${missingControl.join(', ')}"
+            status_detail = parts.join(' | ')
+        }
         tuple(
             name,
             treatIds.collect   { sid -> [sid, sampleIndex[sid]] },
             controlIds.collect { sid -> [sid, sampleIndex[sid]] },
-            good_barcodes_file
-        )
+            good_barcodes_file,
+            status,
+            status_detail
+        )        
     }
 }
 
@@ -152,13 +162,22 @@ def createSampleInputChannelAndDecideIfToRun2Fast2Q(String samplesheet, String t
 
     if ( samplesheet && !twofast2q_folder ) {
 
+        // def reads_ch = Channel
+        //     .fromPath(samplesheet)
+        //     .splitCsv(header:false)
+        //     .map { row ->
+        //         def filename = file(row[0]).name.replaceFirst(/(?i)\.(fastq|fq)(\.gz)?|_sequence\.txt\.gz$/, '')
+        //         tuple(filename, row[0])
+        //     }
+
         def reads_ch = Channel
             .fromPath(samplesheet)
             .splitCsv(header:false)
             .map { row ->
-                def filename = file(row[0]).name.replaceFirst(/(?i)\.(fastq|fq)(\.gz)?|_sequence\.txt\.gz$/, '')
-                tuple(filename, row[0])
-            }
+                def reads_file = file(row[0])
+                def filename = reads_file.name.replaceFirst(/(?i)(\.(fastq|fq)(\.gz)?|_sequence\.txt\.gz)$/, '')
+                tuple(filename, reads_file)
+            }        
 
 
         return [ reads_ch: reads_ch, run_counts: true ]
@@ -180,4 +199,51 @@ def createSampleInputChannelAndDecideIfToRun2Fast2Q(String samplesheet, String t
         System.exit(1)
     }
 
+}
+
+// Module exporting the get_comparison_status process so it can be included multiple times
+process get_comparison_status {
+
+    publishDir "${params.outdir}/comparisons_status/", mode: 'copy', overwrite: true
+
+    input:
+    val comparisons_status_list
+    val type
+
+    output:
+    path "comparisons_status_${type}.tsv"
+
+    script:
+    // Build the table as a single Groovy string
+    def lines = comparisons_status_list.collect { name, status, detail ->
+        "${name}\t${status}\t${detail ?: ''}"
+    }.join('\\n')
+
+    """
+    printf '%s\n' "comparison\tstatus\tstatus_detail" > comparisons_status_${type}.tsv
+    printf '%b\n' "${lines}" >> comparisons_status_${type}.tsv
+    """
+}
+
+def stop_after_barcode_extraction_and_warn(all_counts) {
+    // materialize channel into list and emit a single view message when the flag is set
+    if( params.stop_after_barcode_extraction as boolean ) {
+        all_counts.toList()
+            .view { tuples ->
+                log.warn """
+                ================================
+                STOP AFTER BARCODE EXTRACTION
+                ================================
+                Parameter: --stop_after_barcode_extraction true
+
+                Barcode extraction and count matrix generation have completed.
+                No downstream merging or mbarq analysis will be performed.
+                Disable this behavior by omitting the parameter or setting:
+                    --stop_after_barcode_extraction false
+                ================================
+                """.stripIndent()
+            }
+        return true
+    }
+    return false
 }

@@ -38,8 +38,8 @@ nextflow run "${project_dir}/main.nf" \
   --sample_goodbarcodes_library_map "${project_dir}/test_data/sample_goodbarcodesfile_map.csv" \
   --outdir "${base_outdir}/${RUN_ID}" \
   --comparisons "${project_dir}/test_data/comparisons.json" \
-  --singularity true \
-  --conda false \
+  --singularity false \
+  --conda true \
   --stop_after_barcode_extraction false \
   -resume \
   -work-dir "${base_outdir}/${RUN_ID}/work"

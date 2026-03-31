@@ -1,16 +1,13 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-import groovy.json.JsonSlurper
-
-include { create_counts } from './modules/create_barcode_count_matrix'
+include { barcode_counter } from './modules/count_barcodes'
+include { barseq_qc_wf } from './modules/barseq_qc'
 include {
-    buildSampleIndex
-    resolveSelectors
-    buildComparisonList
     createSampleInputChannelAndDecideIfToRun2Fast2Q
-} from './modules/utils.nf'
-include { merge_and_analyze } from './modules/merge_and_mbarq'
+    stop_after_barcode_extraction_and_warn
+} from './modules/utils'
+include { fitness_analysis } from './modules/fitness_analysis'
 
 //params.singularity  = params.singularity == true
 // raw CLI param (may or may not exist)
@@ -70,7 +67,7 @@ workflow {
 
     sample_goodbarcodes_library_map = Channel.fromPath(params.sample_goodbarcodes_library_map)
                                       .splitCsv(header:false)
-                                      .map { row -> tuple(row[0], row[1], row[2]) } //TODO: This can be moved into the conditional statement - but I have a pipeline running so don't want to mess things up
+                                      .map { row -> tuple(row[0], file(row[1]), row[2]) } //TODO: This can be moved into the conditional statement - but I have a pipeline running so don't want to mess things up
 
     input_info = createSampleInputChannelAndDecideIfToRun2Fast2Q(
         params.samplesheet,
@@ -80,78 +77,108 @@ workflow {
     def reads_ch   = input_info.reads_ch
     def run_counts = input_info.run_counts
 
-
-
     if( run_counts ) {
         // join read_ch and sample_goodbarcodes_library_map on first field to get 3-element tuples
         reads_ch = reads_ch
             .join(sample_goodbarcodes_library_map)
-        create_counts(reads_ch)
-        all_counts_list_ch = create_counts.out.result.toList()
+        barcode_counter(reads_ch)
+        all_counts = barcode_counter.out.result
     }
     else {
-        all_counts_list_ch = reads_ch.toList()
+        all_counts = reads_ch
     }
 
-    if( params.stop_after_barcode_extraction as boolean ) {
-        // force materialization so that create_counts (or its cache) is actually used
-        all_counts_list_ch
-            .view { tuples ->
-                log.warn """
-                ================================
-                STOP AFTER BARCODE EXTRACTION
-                ================================
-                Parameter: --stop_after_barcode_extraction true
-
-                Barcode extraction and count matrix generation have completed.
-                No downstream merging or mbarq analysis will be performed.
-                Disable this behavior by omitting the parameter or setting:
-                    --stop_after_barcode_extraction false
-                ================================
-                """.stripIndent()
-            }
-    // just return from workflow body: pipeline ends successfully
-    return
+    // use utility helper to handle the "stop after barcode extraction" behavior
+    if( stop_after_barcode_extraction_and_warn(all_counts) ) {
+        // just return from workflow body: pipeline ends successfully
+        return
     }
 
-    // load comparisons json
-    comparisons = load_json(params.comparisons)
-
-    // downstream as before
-    all_counts_list_ch
-        .map { tuples ->
-            buildComparisonList(tuples, comparisons)
-        }
-        .set { comparisons_ch }
-
-    comparisons_ch
-        .flatMap { it }
-        .map { name, treat_list, ctrl_list, good_barcodes_file ->
-            def treat_ids   = treat_list.collect { sid, p -> sid }
-            def treat_paths = treat_list.collect { sid, p -> p }
-            def ctrl_ids    = ctrl_list.collect { sid, p -> sid }
-            def ctrl_paths  = ctrl_list.collect { sid, p -> p }
-            tuple(name, treat_ids, treat_paths, ctrl_ids, ctrl_paths, good_barcodes_file)
-        }
-        .set { merge_inputs_ch }
-
-    merge_and_analyze(
-        merge_inputs_ch,
+    barseq_qc_wf(
+        all_counts
+    )
+        
+    // only run fitness analysis on samples that passed QC.
+    // adapt comparisons accordingly (see above)
+    fitness_analysis(
+        barseq_qc_wf.out.fitness_analysis_input,
         filterConfig,
         mbarqConfig,
     )
+
+    ch_pre_mbarq = fitness_analysis.out.pre_mbarq_qc_data_aggregated_ch
+    ch_post_mbarq = fitness_analysis.out.post_mbarq_qc_data_aggregated_ch
+
+    res = ch_pre_mbarq.join(ch_post_mbarq)
+               .map { name, pre_m, post_m -> tuple(name, pre_m, post_m) }
+
+    create_master_comparison_log_proc(
+        res
+    )
+
+    concat_mbarq_qc_results(
+        create_master_comparison_log_proc.out.master_log_ch.collect()
+    )
+
+    get_final_master_log(
+            barseq_qc_wf.out.comparison_validation_log_pre_qc,
+            barseq_qc_wf.out.comparison_validation_log_post_qc,
+            concat_mbarq_qc_results.out.all_comparisons_master_log
+    )
+
 }
 
+process create_master_comparison_log_proc {
+    tag { comparison_name }
+    label 'r_basic'
+    //publishDir "${params.outdir}/comparison_master_logs", mode: 'copy', overwrite: true
 
+    input:
+    tuple val(comparison_name), path(pre_mbarq_log), path(post_mbarq_log)
 
+    output:
+    path("${comparison_name}.master_log.tsv"), emit: master_log_ch
 
-def load_json(
-    String path
-) {
-
-    def jsonFile = file(path)
-    def jsonData = new JsonSlurper().parseText(jsonFile.text)
-
-    return jsonData
+    script:
+    """
+    join_master_logs.R "${comparison_name}" "${pre_mbarq_log}" "${post_mbarq_log}" "${comparison_name}.master_log.tsv"
+    """
 }
 
+process concat_mbarq_qc_results {
+    label 'r_basic'
+    publishDir "${params.outdir}/", mode: 'copy', overwrite: true
+
+    input:
+    path master_files
+
+    output:
+    path("all_comparisons.master_log.tsv"), emit: all_comparisons_master_log
+
+    script:
+    """
+    # Get column names from the first file (assuming all files have the same columns)
+    header=\$(head -n 1 ${master_files[0]})
+    echo "\$header" > all_comparisons.master_log.tsv
+    # Concatenate the rest files, skipping the header of each subsequent file
+    for f in ${master_files.join(' ')}; do cat \${f} | tail -n 1 >> all_comparisons.master_log.tsv; done
+    """
+}
+
+process get_final_master_log {
+    label 'r_basic'
+    publishDir "${params.outdir}/", mode: 'copy', overwrite: true
+
+    input:
+    path pre_qc_logs
+    path post_qc_logs
+    path barseq_qc_logs
+
+    output:
+    path("final_master_log.tsv")
+
+    script:
+    """
+    join_master_logs_2.R "${pre_qc_logs}" "${post_qc_logs}" "${barseq_qc_logs}" "final_master_log.tsv"
+    """
+}

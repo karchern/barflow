@@ -18,16 +18,16 @@ Specifically, as input, we need:
 
 ### Per-sample fastq files
 
-Each sample is assumed to be a single-end fastq file. Add the complete path of each file to a textfile and supply it the **absolute** path to this file using the `--samplesheet` parameter. 
+Each sample is assumed to be a single-end fastq file. Add the  path of each file to a textfile and supply it the path to this file using the `--samplesheet` parameter. 
 The file in each row will be sent to `2fast2q` to have their barcodes extracted. 
 
 A dummy samplesheet looks like this:
 
 ```
-some/complete/path/to/test_data/test_reads/Sample_treatment_1.fastq.gz
-some/complete/path/to/test_data/test_reads/Sample_treatment_2.fastq.gz
-some/complete/path/to/test_data/test_reads/Sample_control_1.fastq.gz
-some/complete/path/to/test_data/test_reads/Sample_control_2.fastq.gz
+some/path/to/test_data/test_reads/Sample_treatment_1.fastq.gz
+some/path/to/test_data/test_reads/Sample_treatment_2.fastq.gz
+some/path/to/test_data/test_reads/Sample_control_1.fastq.gz
+some/path/to/test_data/test_reads/Sample_control_2.fastq.gz
 ```
 
 Fastq files can be gzipped or uncompressed, and sample-IDs are dynamically extracte from the full path. The sample_IDs extracted from the paths above would be as below. **Make sure your file names do not contain dots**, as those will mess up the extraction of the sample_IDs.
@@ -46,10 +46,10 @@ Each sample is based on a specific barcoded transposon library, and each of thos
 For example:
 
 ```
-Sample_treatment_1,some/complete/path/to/test_data/good_barcodes_with_locustag.csv,library_A
-Sample_treatment_2,some/complete/path/to/test_data/good_barcodes_with_locustag.csv,library_A
-Sample_control_1,some/complete/path/to/test_data/good_barcodes_with_locustag.csv,library_A
-Sample_control_2,some/complete/path/to/test_data/good_barcodes_with_locustag.csv,library_A
+Sample_treatment_1,some/path/to/test_data/good_barcodes_with_locustag.csv,library_A
+Sample_treatment_2,some/path/to/test_data/good_barcodes_with_locustag.csv,library_A
+Sample_control_1,some/path/to/test_data/good_barcodes_with_locustag.csv,library_A
+Sample_control_2,some/path/to/test_data/good_barcodes_with_locustag.csv,library_A
 ```
 
 As described above, `library_A` needs to be found in the corresponding `params.library_seqs` in the config so that the correct upstream- and downstream sequences of the transpson can be found
@@ -174,12 +174,14 @@ Next steps you mentioned:
 - Define comparison config format for downstream branches
 - Add tests and example data
 
+# Steps to take after analysis
+- Look at comparsions_status/comparisons_status.tsv and ensure that all encoded comparisons (from `comparisons.json`) could be realized (it compares requested samples against the ones found in the 2fast2q output folder)
+
 # Quirks
 
 - The comparisons defined in the `comparison.json` are based on the entries of the `samplesheet.txt`. What this means is that only what is in the `samplesheet.txt` can be handed over to the differential abundance computation. It is therefore crucial that you 
   - If you use the glob syntax, it will base this on the sampleIDs inferred from the `samplesheet.txt`, _not_ what has already been processed by `2fast2q`
   - If you use the explicit syntax and you specify sampleIDs that are _not_ in the `samplesheet.txt`, the pipeline will crash at the mbarq step because it is looking for a sample to load that it cannot find.
-- Do not use relative paths, only complete paths in `samplesheet` and `sample_goodbarcodes_map`.
 - TODO: Explain negative selection
 - TODO: You can add information to the `good_barcodes_with_locus_tag` file. For example, if you're interested in directionality biases, you can simply add this information to the `locus_tag` column. Importantly, do not add a 3rd column, but instead modify the 2nd to contain this information.
 

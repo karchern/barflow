@@ -14,24 +14,14 @@
      "/scratch/karcher/barflow/test_data/good_barcodes_with_locustag.csv"
     },
     {
-      "name": "glob_syntax",
+      "name": "explicit_syntax_with_negative_selection",
       "treatments": [
-        "Sample_treatment_*"
+        "Sample_treatment_1",
+        "Sample_treatment_2"
     ],
       "controls": [
-        "Sample_control_*"
-    ],
-     "good_barcodes_file" : 
-     "/scratch/karcher/barflow/test_data/good_barcodes_with_locustag.csv"
-    }
-    ,
-    {
-      "name": "glob_syntax_with_negative_selection",
-      "treatments": [
-        "Sample_treatment_*"
-    ],
-      "controls": [
-        "Sample_control_*"
+        "Sample_control_1",
+        "Sample_control_2"
     ],
      "treatments_negative_selection" :
      [
