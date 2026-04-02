@@ -21,6 +21,28 @@ process count_barcodes {
     mkdir -p input
     ln -s "\$PWD/\$fname" input/"\$fname"
 
+    # Check that ${good_barcodes_csv_path} exists, is not empty, and is a csv file
+    if [ ! -s "${good_barcodes_csv_path}" ]; then
+        echo "Error: ${good_barcodes_csv_path} does not exist or is empty."
+        exit 1
+    fi
+    if [[ "${good_barcodes_csv_path}" != *.csv ]]; then
+        echo "Error: ${good_barcodes_csv_path} is not a CSV file."
+        exit 1
+    fi
+    # Also check that it literally has "," characters in it, and the same number per line across the entire file
+    num_commas=\$(head -n 1 "${good_barcodes_csv_path}" | awk -F',' '{print NF-1}')
+    if [ \$num_commas -eq 0 ]; then
+        echo "Error: ${good_barcodes_csv_path} does not contain any commas, and thus is not a valid CSV file."
+        exit 1
+    fi
+    if ! awk -F',' -v num_commas="\$num_commas" 'NF-1 != num_commas { exit 1 }' "${good_barcodes_csv_path}"; then
+        echo "Error: ${good_barcodes_csv_path} does not have the same number of commas on every line, and thus is not a valid CSV file."
+        exit 1
+    fi
+
+
+
     cat ${good_barcodes_csv_path}| cut -d "," -f1 > tmp
     paste tmp tmp > good_barcodes_in_stupid_format.csv
 
