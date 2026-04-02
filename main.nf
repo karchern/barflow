@@ -82,20 +82,20 @@ workflow {
         reads_ch = reads_ch
             .join(sample_goodbarcodes_library_map)
         barcode_counter(reads_ch)
-        all_counts = barcode_counter.out.result
+        all_counts_with_good_barcodes_and_contigs_and_position_ch = barcode_counter.out.result.join(sample_goodbarcodes_library_map)
     }
     else {
-        all_counts = reads_ch
+        all_counts_with_good_barcodes_and_contigs_and_position_ch = reads_ch.join(sample_goodbarcodes_library_map)
     }
 
     // use utility helper to handle the "stop after barcode extraction" behavior
-    if( stop_after_barcode_extraction_and_warn(all_counts) ) {
+    if( stop_after_barcode_extraction_and_warn(all_counts_with_good_barcodes_and_contigs_and_position_ch) ) {
         // just return from workflow body: pipeline ends successfully
         return
     }
 
     barseq_qc_wf(
-        all_counts
+        all_counts_with_good_barcodes_and_contigs_and_position_ch
     )
         
     // only run fitness analysis on samples that passed QC.

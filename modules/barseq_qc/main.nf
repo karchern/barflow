@@ -47,14 +47,16 @@ def load_json(String path) {
 workflow barseq_qc_wf {
 
     take:
-    all_counts
+    all_counts_with_good_barcodes_and_contigs_and_position_ch   // emits: [ sample_id, counts_path, sample_goodbarcodes_contig_map, library]
 
     main:
 
     def comparisons = load_json(params.comparisons)
 
-    // Pass CHANNELs (not materialized Lists) into helpers and processes that expect channels
-    // TODO: check_and_validate_comparisons_post_qc only works with toList() - figure out why and fix. And same for the second call after filtering below.
+    all_counts_with_good_barcodes_and_contigs_and_position_ch.
+         map { sample_id, counts_path, sample_goodbarcodes_contig_map, library -> tuple(sample_id, counts_path) }
+         .set { all_counts } // retain this and pass to most downstream functions to ensure everything is working as intended - at some point this could be improved
+
     def comps = check_and_validate_comparisons_post_qc(all_counts, comparisons)
     def fitness_analysis_input_ch = comps[0]
     def comparisons_status_list = comps[1]
@@ -63,19 +65,20 @@ workflow barseq_qc_wf {
     comparison_validation_log_pre_qc = validate_comparisons_pre_qc(comparisons_status_list, "before_barseq_qc")        
 
     // Run per-sample BarSeq QC using the channel of counts
-    barseq_qc(all_counts, params.minimum_read_sum_for_qc)
+    // all_counts_with_good_barcodes_and_contigs_and_position_ch also contains the sample_goodbarcodes_contig_map and library info - so retain the info
+    barseq_qc(all_counts_with_good_barcodes_and_contigs_and_position_ch, params.minimum_read_sum_for_qc)
 
     // merge barcode_count_sample_metrics
     barseq_qc.out.
          // extract sample_id from [sample_id, counts_path]
-        map { sample_id, metrics_path, qc_passed -> metrics_path }
+        map { sample_id, metrics_path, qc_passed, median_of_medians -> metrics_path}
         .toList()
         .set { metrics_paths }
     
     // Based on the barseq_qc output, build a channel of sample_ids that passed QC. We will use this to filter the comparisons.
     sample_ids_passed_ch = barseq_qc.out
-        .filter { sample_id, metrics_path, qc_passed -> qc_passed.text.trim() == '1' }
-        .map { sample_id, metrics_path, qc_passed -> sample_id }
+        .filter { sample_id, metrics_path, qc_passed, median_of_medians -> qc_passed.text.trim() == '1' }
+        .map { sample_id, metrics_path, qc_passed, median_of_medians -> sample_id }
         .map { sid -> tuple(sid) }
 
     // Join the original counts CHANNEL with the passed-samples channel to get only passing samples
@@ -162,7 +165,10 @@ process collate_barseq_qc_results {
 
     script:
     """
-    echo -e "sample_id,total_reads,n_barcodes,max_count,mean_count,median_count" > all_samples.barcode_metrics.tsv
+    #echo -e "sample_id,total_reads,n_barcodes,max_count,mean_count,median_count," > all_samples.barcode_metrics.tsv
+    #Take header from first file, saver than this shit above :)
+    header=\$(head -n 1 ${metrics_file_paths[0]})
+    echo "\$header" > all_samples.barcode_metrics.tsv
     for f in *.csv; do
         tail -n +2 "\$f" >> all_samples.barcode_metrics.tsv
     done
@@ -175,17 +181,19 @@ process barseq_qc {
     label 'python_basic'
 
     input:
-    tuple val(sample_id), path(counts_path)
+    tuple val(sample_id), path(counts_path), path(sample_goodbarcodes_contig_position_map), val(library)
     val(minimum_read_sum_for_qc)
 
     output:
-    tuple val(sample_id), path("${sample_id}.barcode_metrics.csv"), path("${sample_id}.passed_qc.txt"), emit: metrics
+    tuple val(sample_id), path("${sample_id}.barcode_metrics.csv"), path("${sample_id}.passed_qc.txt"), path("${sample_id}.median_of_medians_over_genomes.csv"), emit: metrics
 
     """
     barseq_qc.py \
         --sample_id ${sample_id} \
-        --input ${counts_path} \
-        --output ${sample_id}.barcode_metrics.csv \
+        --input_counts ${counts_path} \
+        --sample_goodbarcodes_contig_position_map ${sample_goodbarcodes_contig_position_map} \
+        --output_barcode_metrics ${sample_id}.barcode_metrics.csv \
+        --output_median_of_medians_over_genomes ${sample_id}.median_of_medians_over_genomes.csv \
         --output_passed ${sample_id}.passed_qc.txt \
         --min_read_sum_for_qc ${minimum_read_sum_for_qc}
     
