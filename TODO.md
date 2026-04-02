@@ -1,9 +1,5 @@
 # QC steps to implement
 
-## 2fast2q - single sample
-Total read Read depth -> log
-Fraction of reads that had a barcode identified -> log
-
 ## barcode count matrix filtering
 genomic coverage bias (for this you will also need to give scaffold information) -> plot
 
