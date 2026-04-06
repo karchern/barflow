@@ -23,14 +23,6 @@
         "Sample_control_1",
         "Sample_control_2"
     ],
-     "treatments_negative_selection" :
-     [
-        "Sample_treatment_1"
-     ],
-     "controls_negative_selection" :
-     [
-        "Sample_control_2"
-     ],
      "good_barcodes_file" : 
      "/scratch/karcher/barflow/test_data/good_barcodes_with_locustag.csv"
     }

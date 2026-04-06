@@ -66,7 +66,7 @@ workflow barseq_qc_wf {
 
     // Run per-sample BarSeq QC using the channel of counts
     // all_counts_with_good_barcodes_and_contigs_and_position_ch also contains the sample_goodbarcodes_contig_map and library info - so retain the info
-    barseq_qc(all_counts_with_good_barcodes_and_contigs_and_position_ch, params.minimum_read_sum_for_qc)
+    barseq_qc(all_counts_with_good_barcodes_and_contigs_and_position_ch, params.minimum_read_sum_for_qc, params.minimum_median_barcode_count)
 
     // merge barcode_count_sample_metrics
     barseq_qc.out.
@@ -183,6 +183,7 @@ process barseq_qc {
     input:
     tuple val(sample_id), path(counts_path), path(sample_goodbarcodes_contig_position_map), val(library)
     val(minimum_read_sum_for_qc)
+    val(minimum_median_barcode_count)
 
     output:
     tuple val(sample_id), path("${sample_id}.barcode_metrics.csv"), path("${sample_id}.passed_qc.txt"), path("${sample_id}.median_of_medians_over_genomes.csv"), emit: metrics
@@ -195,7 +196,8 @@ process barseq_qc {
         --output_barcode_metrics ${sample_id}.barcode_metrics.csv \
         --output_median_of_medians_over_genomes ${sample_id}.median_of_medians_over_genomes.csv \
         --output_passed ${sample_id}.passed_qc.txt \
-        --min_read_sum_for_qc ${minimum_read_sum_for_qc}
+        --min_read_sum_for_qc ${minimum_read_sum_for_qc} \
+        --min_median_barcode_count ${minimum_median_barcode_count}
     
     """
 }

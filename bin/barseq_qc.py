@@ -147,6 +147,7 @@ parser.add_argument('--output_barcode_metrics', type=str, required=True, help="O
 parser.add_argument('--output_median_of_medians_over_genomes', type=str, required=True, help="TODO")
 parser.add_argument('--output_passed', type=str, required=True, help="Output file to write '1' if sample passed QC, '0' otherwise.")
 parser.add_argument('--min_read_sum_for_qc', type=int, help="Minimum total read count for sample to pass QC.")
+parser.add_argument('--min_median_barcode_count', type=int, help="Minimum median barcode count for sample to pass QC.")
 
 args = parser.parse_args()
 counts_file_path = args.input_counts
@@ -207,7 +208,12 @@ trough_location = PTR_results[0][3]
 peak            = PTR_results[0][4]
 trough          = PTR_results[0][5]
 
-if total_reads >= int(args.min_read_sum_for_qc):
+qc_passed = (
+    total_reads >= int(args.min_read_sum_for_qc)
+    and median_count >= int(args.min_median_barcode_count)
+)
+
+if qc_passed:
     with open(args.output_passed, 'w') as f:
         f.write('1')
 else:

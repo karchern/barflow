@@ -41,5 +41,7 @@ nextflow run "${project_dir}/main.nf" \
   --singularity false \
   --conda true \
   --stop_after_barcode_extraction false \
+  --minimum_read_sum_for_qc 6 \
+  --minimum_median_barcode_count 0 \
   -resume \
   -work-dir "${base_outdir}/${RUN_ID}/work"
