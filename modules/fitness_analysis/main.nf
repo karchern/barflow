@@ -213,10 +213,12 @@ process mbarq {
       echo "norm_method=${mbarq_config.normalization}"
     } > ${comparison_name}.mbarq.log.txt
 
-    # Decompress into a new file (Nextflow staged file may be a symlink)
-    #gunzip -c "${merged_matrices_path}" > "${merged_matrices_path}.decompressed" # Not necessary since mbarq can read in gzipped files directly
+    merged_matrices_path_decompressed="\$(echo ${merged_matrices_path} | sed 's/.gz\$//')"
 
-    mbarq analyze -i ${merged_matrices_path} \
+    # Decompress into a new file, and remove contig/position columns
+    zcat -c "${merged_matrices_path}" | cut -d "," -f1,2,5- > "\${merged_matrices_path_decompressed}.decompressed"
+
+    mbarq analyze -i "\${merged_matrices_path_decompressed}.decompressed" \
       -s ${mbarq_meta_path} \
       --treatment_column treatment --baseline control \
       --norm_method ${mbarq_config.normalization}
