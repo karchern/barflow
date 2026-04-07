@@ -178,7 +178,7 @@ process collate_barseq_qc_results {
 
 process barseq_qc {
 
-    label 'python_basic'
+    label 'python_basic_quick_process'
 
     input:
     tuple val(sample_id), path(counts_path), path(sample_goodbarcodes_contig_position_map), val(library)
