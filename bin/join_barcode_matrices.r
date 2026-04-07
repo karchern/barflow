@@ -65,11 +65,11 @@ all_data_reduced <-
         by = c("#Feature")
     )
 
-good_barcodes_with_locustag <- read_csv(good_barcodes_csv_path, col_names = F)
-colnames(good_barcodes_with_locustag) <- c("#Feature", "locus_tag")
+good_barcodes_with_locustag <- read_csv(good_barcodes_csv_path, col_names = TRUE)
+colnames(good_barcodes_with_locustag)[1] <- "#Feature"
 
 all_data_reduced <- all_data_reduced %>%
     left_join(good_barcodes_with_locustag, by = "#Feature") %>%
-    relocate(`#Feature`, locus_tag)
+    relocate(`#Feature`, locus_tag, contig, position)
 
 write_csv(all_data_reduced, output_file)
