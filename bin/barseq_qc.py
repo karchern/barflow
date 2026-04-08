@@ -50,24 +50,34 @@ def fit_piecewise_ptr(xs, ys):
         for split_idx in range(2, n - 2):
             split_x = x_rot[split_idx]
 
-            x_left = x_rot[:split_idx + 1]
-            y_left = y_rot[:split_idx + 1]
-            x_right = x_rot[split_idx:]
-            y_right = y_rot[split_idx:]
+            z = x_rot - x_rot[0]
+            split_z = float(z[split_idx])
 
-            if len(np.unique(x_left)) < 2 or len(np.unique(x_right)) < 2:
+            if split_z <= 0 or split_z >= circumference:
                 continue
 
-            m_left, b_left = np.polyfit(x_left, y_left, 1)
-            m_right, b_right = np.polyfit(x_right, y_right, 1)
+            # Circular-continuous piecewise model (no jump at split and no jump at wrap):
+            # y(z) = a + b*z + c*max(0, z-s), with y(0)=y(C)
+            # => b*C + c*(C-s) = 0  => c = -b*C/(C-s)
+            # Substitute to fit only [a,b] for each split s.
+            denom = circumference - split_z
+            if denom <= 0:
+                continue
+
+            h = np.maximum(0.0, z - split_z)
+            basis = z - (circumference / denom) * h
+            X = np.column_stack([np.ones_like(z), basis])
+            beta, _, _, _ = np.linalg.lstsq(X, y_rot, rcond=None)
+            a, b = beta
+            c = -b * circumference / denom
+            m_left = float(b)
+            m_right = float(b + c)
 
             # Constrain to PTR shape on the circle: down then up.
             if not (m_left < 0 and m_right > 0):
                 continue
 
-            yhat_rot = np.empty_like(y_rot)
-            yhat_rot[:split_idx + 1] = m_left * x_left + b_left
-            yhat_rot[split_idx:] = m_right * x_right + b_right
+            yhat_rot = a + b * z + c * h
 
             # Map predictions back to sorted original coordinate order.
             yhat_sorted = np.empty_like(y)
@@ -88,6 +98,13 @@ def fit_piecewise_ptr(xs, ys):
                 else:
                     ptr = None
 
+                left_size = float(split_z)
+                right_size = float(circumference - split_z)
+                if left_size > 0 and right_size > 0:
+                    half_size_ratio = max(left_size, right_size) / min(left_size, right_size)
+                else:
+                    half_size_ratio = None
+
                 best = {
                     'x_sorted': x,
                     'yhat_sorted': yhat_sorted,
@@ -101,6 +118,7 @@ def fit_piecewise_ptr(xs, ys):
                     'peak_location': int(round(float(x[peak_idx]))),
                     'trough_location': int(round(float(x[trough_idx]))),
                     'ptr': ptr,
+                    'half_size_ratio': half_size_ratio,
                 }
 
     return best
@@ -215,6 +233,8 @@ def smoothing_1(
 
             fit_for_plot = fit_piecewise_ptr(xs, ys)
             r2_text = 'NA'
+            half_ratio_text = 'NA'
+            ptr_text = 'NA'
             if fit_for_plot is not None:
                 ax.plot(
                     fit_for_plot['x_sorted'],
@@ -224,10 +244,17 @@ def smoothing_1(
                     label='piecewise fit'
                 )
                 r2_text = f"{fit_for_plot['r2']:.3f}"
+                if fit_for_plot.get('half_size_ratio') is not None:
+                    half_ratio_text = f"{fit_for_plot['half_size_ratio']:.3f}"
+                if fit_for_plot.get('ptr') is not None:
+                    ptr_text = f"{fit_for_plot['ptr']:.3f}"
 
             ax.set_xlabel('Genomic position (bp)')
             ax.set_ylabel('Sliding-window mean coverage')
-            ax.set_title(f'{sample_id} sliding_window_mean (R2={r2_text})')
+            ax.set_title(
+                f'{sample_id} sliding_window_mean\n'
+                f'PTR={ptr_text} | R2={r2_text} | half_size_ratio={half_ratio_text}'
+            )
             cbar = fig.colorbar(scatter, ax=ax)
             cbar.set_label('Observed genomic sites in window')
             if peak_location is not None:
@@ -255,6 +282,8 @@ def smoothing_1(
 
                 fit_top = fit_piecewise_ptr(xs_top, ys_top)
                 r2_top_text = 'NA'
+                half_ratio_top_text = 'NA'
+                ptr_top_text = 'NA'
                 if fit_top is not None:
                     ax2.plot(
                         fit_top['x_sorted'],
@@ -264,10 +293,17 @@ def smoothing_1(
                         label='piecewise fit'
                     )
                     r2_top_text = f"{fit_top['r2']:.3f}"
+                    if fit_top.get('half_size_ratio') is not None:
+                        half_ratio_top_text = f"{fit_top['half_size_ratio']:.3f}"
+                    if fit_top.get('ptr') is not None:
+                        ptr_top_text = f"{fit_top['ptr']:.3f}"
 
                 ax2.set_xlabel('Genomic position (bp)')
                 ax2.set_ylabel('Sliding-window mean coverage')
-                ax2.set_title(f'{sample_id} sliding_window_mean top50pct_sites (R2={r2_top_text})')
+                ax2.set_title(
+                    f'{sample_id} sliding_window_mean top50pct_sites\n'
+                    f'PTR={ptr_top_text} | R2={r2_top_text} | half_size_ratio={half_ratio_top_text}'
+                )
                 cbar2 = fig2.colorbar(scatter2, ax=ax2)
                 cbar2.set_label('Observed genomic sites in window')
                 if fit_top is not None:
