@@ -2,6 +2,108 @@
 import pandas as pd
 from pathlib import Path
 import argparse
+import numpy as np
+
+
+def fit_piecewise_ptr(xs, ys):
+    """Fit a circular two-segment piecewise model (down then up).
+
+    We optimize over:
+    - a circular cut point (genome coordinate where we unwrap the circle), and
+    - a split point in the unwrapped axis.
+
+    This keeps the model as two linear segments on a circular genome while allowing
+    apparent 2- or 3-segment shapes on the displayed linear coordinate axis.
+    """
+    if len(xs) < 6:
+        return None
+
+    x = np.asarray(xs, dtype=float)
+    y = np.asarray(ys, dtype=float)
+
+    order = np.argsort(x)
+    x = x[order]
+    y = y[order]
+
+    if len(x) < 2:
+        return None
+
+    diffs = np.diff(x)
+    diffs = diffs[diffs > 0]
+    if len(diffs) == 0:
+        return None
+
+    # Approximate circular genome length from span + typical bin spacing.
+    circumference = float((x[-1] - x[0]) + np.median(diffs))
+    if circumference <= 0:
+        return None
+
+    n = len(x)
+
+    best = None
+    for cut_idx in range(n):
+        # Unwrap circle starting at cut_idx.
+        x_rot = np.concatenate([x[cut_idx:], x[:cut_idx] + circumference])
+        y_rot = np.concatenate([y[cut_idx:], y[:cut_idx]])
+        rot_to_sorted_idx = np.concatenate([np.arange(cut_idx, n), np.arange(0, cut_idx)])
+
+        for split_idx in range(2, n - 2):
+            split_x = x_rot[split_idx]
+
+            x_left = x_rot[:split_idx + 1]
+            y_left = y_rot[:split_idx + 1]
+            x_right = x_rot[split_idx:]
+            y_right = y_rot[split_idx:]
+
+            if len(np.unique(x_left)) < 2 or len(np.unique(x_right)) < 2:
+                continue
+
+            m_left, b_left = np.polyfit(x_left, y_left, 1)
+            m_right, b_right = np.polyfit(x_right, y_right, 1)
+
+            # Constrain to PTR shape on the circle: down then up.
+            if not (m_left < 0 and m_right > 0):
+                continue
+
+            yhat_rot = np.empty_like(y_rot)
+            yhat_rot[:split_idx + 1] = m_left * x_left + b_left
+            yhat_rot[split_idx:] = m_right * x_right + b_right
+
+            # Map predictions back to sorted original coordinate order.
+            yhat_sorted = np.empty_like(y)
+            yhat_sorted[rot_to_sorted_idx] = yhat_rot
+
+            ss_res = float(np.sum((y - yhat_sorted) ** 2))
+            ss_tot = float(np.sum((y - np.mean(y)) ** 2))
+            r2 = 0.0 if ss_tot == 0 else 1.0 - (ss_res / ss_tot)
+
+            if best is None or r2 > best['r2']:
+                peak_idx = int(np.argmax(yhat_sorted))
+                trough_idx = int(np.argmin(yhat_sorted))
+                trough_val = float(yhat_sorted[trough_idx])
+                peak_val = float(yhat_sorted[peak_idx])
+
+                if trough_val > 0:
+                    ptr = peak_val / trough_val
+                else:
+                    ptr = None
+
+                best = {
+                    'x_sorted': x,
+                    'yhat_sorted': yhat_sorted,
+                    'r2': r2,
+                    'split_x': float(split_x),
+                    'cut_x': float(x[cut_idx]),
+                    'm_left': float(m_left),
+                    'm_right': float(m_right),
+                    'peak': peak_val,
+                    'trough': trough_val,
+                    'peak_location': int(round(float(x[peak_idx]))),
+                    'trough_location': int(round(float(x[trough_idx]))),
+                    'ptr': ptr,
+                }
+
+    return best
 
 # Code was adapted from https://github.com/alipirani88/Growth-rate-estimate/blob/master/modules/generate_PTR_dataframe.py
 def smoothing_1(
@@ -71,12 +173,22 @@ def smoothing_1(
     print(f"Total number of bins: {total_bins}")
     print(f"The number of bins with sufficient mapped reads: {sufficient_coverage}")
 
-    # PTR and peak/trough inference are intentionally disabled for now.
-    PTR_median = None
-    peak = None
-    through = None
-    peak_location = None
-    through_location = None
+    xs_all = [int(x) for x in bin_centers]
+    ys_all = [float(y) for y in moving_mean_array]
+
+    fit_full = fit_piecewise_ptr(xs_all, ys_all)
+    if fit_full is None:
+        PTR_median = None
+        peak = None
+        through = None
+        peak_location = None
+        through_location = None
+    else:
+        PTR_median = fit_full['ptr']
+        peak = fit_full['peak']
+        through = fit_full['trough']
+        peak_location = fit_full['peak_location']
+        through_location = fit_full['trough_location']
 
     a = [
         sample_id, PTR_median,peak_location, through_location,peak,through
@@ -100,16 +212,29 @@ def smoothing_1(
         if xs and ys:
             fig, ax = plt.subplots(figsize=(10, 4))
             scatter = ax.scatter(xs, ys, s=12, c=cs, cmap='viridis', alpha=0.85)
+
+            fit_for_plot = fit_piecewise_ptr(xs, ys)
+            r2_text = 'NA'
+            if fit_for_plot is not None:
+                ax.plot(
+                    fit_for_plot['x_sorted'],
+                    fit_for_plot['yhat_sorted'],
+                    color='crimson',
+                    linewidth=2,
+                    label='piecewise fit'
+                )
+                r2_text = f"{fit_for_plot['r2']:.3f}"
+
             ax.set_xlabel('Genomic position (bp)')
             ax.set_ylabel('Sliding-window mean coverage')
-            ax.set_title(f'{sample_id} sliding_window_mean (PTR=NA)')
+            ax.set_title(f'{sample_id} sliding_window_mean (R2={r2_text})')
             cbar = fig.colorbar(scatter, ax=ax)
             cbar.set_label('Observed genomic sites in window')
             if peak_location is not None:
                 ax.axvline(peak_location, color='C1', linestyle='--', label='peak')
             if through_location is not None:
                 ax.axvline(through_location, color='C2', linestyle=':', label='trough')
-            if peak_location is not None or through_location is not None:
+            if peak_location is not None or through_location is not None or fit_for_plot is not None:
                 ax.legend()
             outfn = f'{sample_id}_median_sliding_window.png'
             plt.tight_layout()
@@ -127,11 +252,26 @@ def smoothing_1(
             if xs_top and ys_top:
                 fig2, ax2 = plt.subplots(figsize=(10, 4))
                 scatter2 = ax2.scatter(xs_top, ys_top, s=12, c=cs_top, cmap='viridis', alpha=0.85)
+
+                fit_top = fit_piecewise_ptr(xs_top, ys_top)
+                r2_top_text = 'NA'
+                if fit_top is not None:
+                    ax2.plot(
+                        fit_top['x_sorted'],
+                        fit_top['yhat_sorted'],
+                        color='crimson',
+                        linewidth=2,
+                        label='piecewise fit'
+                    )
+                    r2_top_text = f"{fit_top['r2']:.3f}"
+
                 ax2.set_xlabel('Genomic position (bp)')
                 ax2.set_ylabel('Sliding-window mean coverage')
-                ax2.set_title(f'{sample_id} sliding_window_mean top50pct_sites (PTR=NA)')
+                ax2.set_title(f'{sample_id} sliding_window_mean top50pct_sites (R2={r2_top_text})')
                 cbar2 = fig2.colorbar(scatter2, ax=ax2)
                 cbar2.set_label('Observed genomic sites in window')
+                if fit_top is not None:
+                    ax2.legend()
                 outfn2 = f'{sample_id}_median_sliding_window_top50pct_sites.png'
                 plt.tight_layout()
                 fig2.savefig(outfn2, dpi=150)
