@@ -199,11 +199,10 @@ process mbarq {
           path("${comparison_name}.filtered.merged.barcode.matrices.csv_Experiment.log"),
           emit: mbarq_experiment_log
 
-
-    // step log
     tuple val(comparison_name),
           path("${comparison_name}.mbarq.log.txt"),
           emit: mbarq_log_ch
+
 
 
     script:

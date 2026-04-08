@@ -13,11 +13,11 @@ def smoothing_1(
     sample_id
     ):
 
-    moving_median_array = []
+    moving_mean_array = []
     sufficient_coverage = 0
 
     step = 100
-    median_of_medians_size = 100
+    median_of_medians_size = 10000
     ll = list(range(0, len(read_counts) - window + 1, step))
 
     if not ll:
@@ -51,29 +51,31 @@ def smoothing_1(
                     zeros_in_window += 1
 
         # all zeros in this window?
-        if zeros_in_window < (0.1*(window)):
+        if zeros_in_window < (0.01*(window)):
             sufficient_coverage += 1
-        moving_median_array.append(statistics.median(read_counts[start:end]))
+        # Do NOT use the median here - especially if you work with mariner transposon data the median of a genomic window will almost certainly be all 0s. 
+        # Unless you supply only TA site to the PTR calculation function, in which case the median of medians should work just fine. 
+        # But for now, to be more general, we will use the mean for the first level of smoothing and then take the median of means for the second level of smoothing to be more robust to outliers.
+        #moving_mean_array.append(statistics.mean(read_counts[start:end])) 
+        moving_mean_array.append(sum(read_counts[start:end])/len(read_counts[start:end])) 
             
-
     print(f"Total number of bins: {total_bins}")
     print(f"The number of bins with sufficient mapped reads: {sufficient_coverage}")
 
     ## Step 3
     median_sliding_window_array = []
-    for i in range(0, len(moving_median_array), 1):
+    for i in range(0, len(moving_mean_array), 1):
         start = i
         end = i + median_of_medians_size
-        if len(moving_median_array[start:end]) > (median_of_medians_size/2):
-            median_sliding_window_array.append(statistics.median(moving_median_array[start:end]))
+        if len(moving_mean_array[start:end]) > (median_of_medians_size/2):
+            #median_sliding_window_array.append(statistics.median(moving_mean_array[start:end]))
+            median_sliding_window_array.append(
+                sum(moving_mean_array[start:end])/len(moving_mean_array[start:end])
+            )
         else:
             median_sliding_window_array.append(None)
 
     ## Step 4
-
-    
-
-
     peak = max([x for x in median_sliding_window_array if x is not None])  # ignore None
     peak_index = median_sliding_window_array.index(peak)
     if all([(x == 0 or x == None) for x in median_sliding_window_array]):
@@ -86,6 +88,10 @@ def smoothing_1(
         through_index = median_sliding_window_array.index(through)
     PTR_median = peak/through
 
+    # Plot median_sliding_window as a line plot and save to file. Use matplotlib
+
+    # remove interactive breakpoint; produce a PNG of the median sliding window
+    
     def second_level_index_to_genomic_position(idx, ll, step, median_of_medians_size, window):
             if idx is None:
                 return None
@@ -115,8 +121,46 @@ def smoothing_1(
         sample_id, PTR_median,peak_location, through_location,peak,through
     ]
 
+    # --- Plotting ---
+    try:
+        # Use non-interactive backend for headless environments
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
 
-    #with open(out_path_base + "/" + "base.csv", 'w') as out:
+        xs = []
+        ys = []
+        for ii, val in enumerate(median_sliding_window_array):
+            pos = second_level_index_to_genomic_position(
+                ii, ll, step, median_of_medians_size, window
+            )
+            if pos is None or val is None:
+                continue
+            xs.append(pos)
+            ys.append(val)
+
+        if xs and ys:
+            fig, ax = plt.subplots(figsize=(10, 4))
+            ax.plot(xs, ys, linewidth=1, color='C0')
+            ax.set_xlabel('Genomic position (bp)')
+            ax.set_ylabel('Median of means (counts)')
+            ax.set_title(f'{sample_id} median_sliding_window (PTR={PTR_median:.2f})')
+            if peak_location is not None:
+                ax.axvline(peak_location, color='C1', linestyle='--', label='peak')
+            if through_location is not None:
+                ax.axvline(through_location, color='C2', linestyle=':', label='trough')
+            if peak_location is not None or through_location is not None:
+                ax.legend()
+            outfn = f'{sample_id}_median_sliding_window.png'
+            plt.tight_layout()
+            fig.savefig(outfn, dpi=150)
+            plt.close(fig)
+            print(f'Saved median sliding window plot to {outfn}')
+        else:
+            print('No valid points to plot for median_sliding_window_array')
+    except Exception as e:
+        print(f'Could not create median sliding window plot: {e}')
+
     b = []
     header = "bin,bin_genomic_center,count\n"
     count = 0
@@ -144,7 +188,7 @@ parser.add_argument('--input_counts', type=str, required=True, help="2-column ba
 parser.add_argument('--sample_goodbarcodes_contig_position_map', type=str, required=True, help="TODO") 
 parser.add_argument('--output_barcode_metrics', type=str, required=True, help="Output TSV file for sample metrics.")
 #parser.add_argument('--output_PTR', type=str, required=True, help="TODO")
-parser.add_argument('--output_median_of_medians_over_genomes', type=str, required=True, help="TODO")
+parser.add_argument('--output_median_of_means_over_genomes', type=str, required=True, help="TODO")
 parser.add_argument('--output_passed', type=str, required=True, help="Output file to write '1' if sample passed QC, '0' otherwise.")
 parser.add_argument('--min_read_sum_for_qc', type=int, help="Minimum total read count for sample to pass QC.")
 parser.add_argument('--min_median_barcode_count', type=int, help="Minimum median barcode count for sample to pass QC.")
@@ -158,13 +202,29 @@ df = pd.read_csv(counts_file_path, sep=',')
 df.columns = ['barcode', 'count']
 
 df_with_good_barcodes_and_contigs = df.join(pd.read_csv(args.sample_goodbarcodes_contig_position_map, sep=',').set_index('barcode'), on='barcode', how='inner')
+
 if len(set(df_with_good_barcodes_and_contigs['contig'])) > 1:
     print(
-        "PTR calculation is not possible with fragmented assemblies. Skipping rest of script."
+        """
+        It looks like you have more than one contig... Checking if we have 2 and one is much longer than the other, 
+        which would suggest that the shorter one is a plasmid and we can proceed with the longer one. If not, we cannot 
+        proceed with PTR calculation since it relies on having a single contig.
+        """
     )
-
-# df_with_good_barcodes_and_contigs does not contain entries for each position.
-# Assume that max(position) is the length of the contig, and add all MISSING positions between 0 and that value
+    if len(set(df_with_good_barcodes_and_contigs['contig'])) == 2:
+        print(
+            "We have 2 contigs. Checking if one is much longer than the other..."
+        )
+        contig_lengths = df_with_good_barcodes_and_contigs.groupby('contig')['position'].max()
+        if contig_lengths.min() < 0.1 * contig_lengths.max() and contig_lengths.max() > 1E6:
+            print(
+                "One contig is much longer than the other, and the longer one is > 1Mb. Assuming the shorter one is a plasmid and proceeding with the longer one."
+            )
+            df_with_good_barcodes_and_contigs = df_with_good_barcodes_and_contigs[df_with_good_barcodes_and_contigs['contig'] == contig_lengths.idxmax()]
+    else:
+        exit(
+            "We have more than 2 contigs, or the length difference is not large enough to assume one is a plasmid. Cannot proceed with PTR calculation since it relies on having a single contig."
+        )
 
 
 df_with_good_barcodes_and_contigs_summed_by_pos = (
@@ -185,20 +245,18 @@ ally.sort_values('position', inplace=True)
 
 PTR_results = smoothing_1(
     read_counts=ally['count'].tolist(),
-    window=10000,
+    window=50000,
     logger=None,
     Config=None,
     sample_id=args.sample_id
 )
 
-# with open(args.output_PTR, 'w') as f:
-#     f.write(str(PTR_results[0]))
-
-with open(args.output_median_of_medians_over_genomes, 'w') as f:
+with open(args.output_median_of_means_over_genomes, 'w') as f:
     f.write(str(PTR_results[1]))
 
+
 total_reads     = int(df['count'].sum())
-n_barcodes      = int((df['count'] > 0).sum())
+n_barcodes_detected      = int((df['count'] > 0).sum())
 max_count       = int(df['count'].max()) if len(df) else 0
 mean_count      = float(df['count'].mean()) if len(df) else 0.0
 median_count    = float(df['count'].median()) if len(df) else 0.0
@@ -223,7 +281,7 @@ else:
 rows.append({
     'sample_id': args.sample_id,
     'total_reads': total_reads,
-    'n_barcodes': n_barcodes,
+    'n_barcodes_detected': n_barcodes_detected,
     'max_count': max_count,
     'mean_count': mean_count,
     'median_count': median_count,

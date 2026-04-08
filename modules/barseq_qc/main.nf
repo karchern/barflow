@@ -71,14 +71,14 @@ workflow barseq_qc_wf {
     // merge barcode_count_sample_metrics
     barseq_qc.out.
          // extract sample_id from [sample_id, counts_path]
-        map { sample_id, metrics_path, qc_passed, median_of_medians -> metrics_path}
+        map { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image -> metrics_path}
         .toList()
         .set { metrics_paths }
     
     // Based on the barseq_qc output, build a channel of sample_ids that passed QC. We will use this to filter the comparisons.
     sample_ids_passed_ch = barseq_qc.out
-        .filter { sample_id, metrics_path, qc_passed, median_of_medians -> qc_passed.text.trim() == '1' }
-        .map { sample_id, metrics_path, qc_passed, median_of_medians -> sample_id }
+        .filter { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image -> qc_passed.text.trim() == '1' }
+        .map { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image -> sample_id }
         .map { sid -> tuple(sid) }
 
     // Join the original counts CHANNEL with the passed-samples channel to get only passing samples
@@ -155,7 +155,7 @@ process collate_barseq_qc_results {
     
     label 'python_basic'
 
-    publishDir "${params.outdir}/barseq_qc/", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/barseq_qc_collated/", mode: 'copy', overwrite: true
 
     input:
     path metrics_file_paths
@@ -180,13 +180,15 @@ process barseq_qc {
 
     label 'python_basic_quick_process'
 
+    publishDir "${params.outdir}/barseq_qc/${sample_id}", mode: 'copy', overwrite: true
+
     input:
     tuple val(sample_id), path(counts_path), path(sample_goodbarcodes_contig_position_map), val(library)
     val(minimum_read_sum_for_qc)
     val(minimum_median_barcode_count)
 
     output:
-    tuple val(sample_id), path("${sample_id}.barcode_metrics.csv"), path("${sample_id}.passed_qc.txt"), path("${sample_id}.median_of_medians_over_genomes.csv"), emit: metrics
+    tuple val(sample_id), path("${sample_id}.barcode_metrics.csv"), path("${sample_id}.passed_qc.txt"), path("${sample_id}.median_of_means_over_genomes.csv"), path("${sample_id}_median_sliding_window.png"), emit: metrics
 
     """
     barseq_qc.py \
@@ -194,11 +196,10 @@ process barseq_qc {
         --input_counts ${counts_path} \
         --sample_goodbarcodes_contig_position_map ${sample_goodbarcodes_contig_position_map} \
         --output_barcode_metrics ${sample_id}.barcode_metrics.csv \
-        --output_median_of_medians_over_genomes ${sample_id}.median_of_medians_over_genomes.csv \
+        --output_median_of_means_over_genomes ${sample_id}.median_of_means_over_genomes.csv \
         --output_passed ${sample_id}.passed_qc.txt \
         --min_read_sum_for_qc ${minimum_read_sum_for_qc} \
         --min_median_barcode_count ${minimum_median_barcode_count}
-    
     """
 }
 
