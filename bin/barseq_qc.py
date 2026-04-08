@@ -4,7 +4,6 @@ from pathlib import Path
 import argparse
 import numpy as np
 
-
 def fit_piecewise_ptr(xs, ys):
     """Fit a circular two-segment piecewise model (down then up).
 
@@ -86,6 +85,9 @@ def fit_piecewise_ptr(xs, ys):
             ss_res = float(np.sum((y - yhat_sorted) ** 2))
             ss_tot = float(np.sum((y - np.mean(y)) ** 2))
             r2 = 0.0 if ss_tot == 0 else 1.0 - (ss_res / ss_tot)
+            rss_fit = ss_res
+            rss_null = ss_tot
+            rss_ratio = None if rss_null == 0 else (rss_fit / rss_null)
 
             if best is None or r2 > best['r2']:
                 peak_idx = int(np.argmax(yhat_sorted))
@@ -119,6 +121,9 @@ def fit_piecewise_ptr(xs, ys):
                     'trough_location': int(round(float(x[trough_idx]))),
                     'ptr': ptr,
                     'half_size_ratio': half_size_ratio,
+                    'rss_fit': rss_fit,
+                    'rss_null': rss_null,
+                    'rss_ratio': rss_ratio,
                 }
 
     return best
@@ -203,6 +208,9 @@ def smoothing_1(
         through_location = None
         r2_full = None
         half_size_ratio_full = None
+        rss_fit_full = None
+        rss_null_full = None
+        rss_ratio_full = None
     else:
         PTR_median = fit_full['ptr']
         peak = fit_full['peak']
@@ -211,6 +219,9 @@ def smoothing_1(
         through_location = fit_full['trough_location']
         r2_full = fit_full['r2']
         half_size_ratio_full = fit_full.get('half_size_ratio')
+        rss_fit_full = fit_full.get('rss_fit')
+        rss_null_full = fit_full.get('rss_null')
+        rss_ratio_full = fit_full.get('rss_ratio')
 
     # Also compute fit metrics for top-50%-sites windows for machine-readable output.
     cs_all_series = pd.Series(observed_sites_per_window)
@@ -222,6 +233,9 @@ def smoothing_1(
     ptr_top50 = None if fit_top_all is None else fit_top_all.get('ptr')
     r2_top50 = None if fit_top_all is None else fit_top_all.get('r2')
     half_size_ratio_top50 = None if fit_top_all is None else fit_top_all.get('half_size_ratio')
+    rss_fit_top50 = None if fit_top_all is None else fit_top_all.get('rss_fit')
+    rss_null_top50 = None if fit_top_all is None else fit_top_all.get('rss_null')
+    rss_ratio_top50 = None if fit_top_all is None else fit_top_all.get('rss_ratio')
 
     a = [
         sample_id,
@@ -235,6 +249,12 @@ def smoothing_1(
         ptr_top50,
         r2_top50,
         half_size_ratio_top50,
+        rss_fit_full,
+        rss_null_full,
+        rss_ratio_full,
+        rss_fit_top50,
+        rss_null_top50,
+        rss_ratio_top50,
     ]
 
     # --- Plotting ---
@@ -260,6 +280,9 @@ def smoothing_1(
             r2_text = 'NA'
             half_ratio_text = 'NA'
             ptr_text = 'NA'
+            rss_fit_text = 'NA'
+            rss_null_text = 'NA'
+            rss_ratio_text = 'NA'
             if fit_for_plot is not None:
                 ax.plot(
                     fit_for_plot['x_sorted'],
@@ -273,12 +296,19 @@ def smoothing_1(
                     half_ratio_text = f"{fit_for_plot['half_size_ratio']:.3f}"
                 if fit_for_plot.get('ptr') is not None:
                     ptr_text = f"{fit_for_plot['ptr']:.3f}"
+                if fit_for_plot.get('rss_fit') is not None:
+                    rss_fit_text = f"{fit_for_plot['rss_fit']:.3g}"
+                if fit_for_plot.get('rss_null') is not None:
+                    rss_null_text = f"{fit_for_plot['rss_null']:.3g}"
+                if fit_for_plot.get('rss_ratio') is not None:
+                    rss_ratio_text = f"{fit_for_plot['rss_ratio']:.3f}"
 
             ax.set_xlabel('Genomic position (bp)')
             ax.set_ylabel('Sliding-window mean coverage')
             ax.set_title(
                 f'{sample_id} sliding_window_mean\n'
-                f'PTR={ptr_text} | R2={r2_text} | half_size_ratio={half_ratio_text}'
+                f'PTR={ptr_text} | R2={r2_text} | half_size_ratio={half_ratio_text}\n'
+                f'rss_fit={rss_fit_text} | rss_null={rss_null_text} | rss_ratio={rss_ratio_text}'
             )
             cbar = fig.colorbar(scatter, ax=ax)
             cbar.set_label('Observed genomic sites in window')
@@ -309,6 +339,9 @@ def smoothing_1(
                 r2_top_text = 'NA'
                 half_ratio_top_text = 'NA'
                 ptr_top_text = 'NA'
+                rss_fit_top_text = 'NA'
+                rss_null_top_text = 'NA'
+                rss_ratio_top_text = 'NA'
                 if fit_top is not None:
                     ax2.plot(
                         fit_top['x_sorted'],
@@ -322,12 +355,19 @@ def smoothing_1(
                         half_ratio_top_text = f"{fit_top['half_size_ratio']:.3f}"
                     if fit_top.get('ptr') is not None:
                         ptr_top_text = f"{fit_top['ptr']:.3f}"
+                    if fit_top.get('rss_fit') is not None:
+                        rss_fit_top_text = f"{fit_top['rss_fit']:.3g}"
+                    if fit_top.get('rss_null') is not None:
+                        rss_null_top_text = f"{fit_top['rss_null']:.3g}"
+                    if fit_top.get('rss_ratio') is not None:
+                        rss_ratio_top_text = f"{fit_top['rss_ratio']:.3f}"
 
                 ax2.set_xlabel('Genomic position (bp)')
                 ax2.set_ylabel('Sliding-window mean coverage')
                 ax2.set_title(
                     f'{sample_id} sliding_window_mean top50pct_sites\n'
-                    f'PTR={ptr_top_text} | R2={r2_top_text} | half_size_ratio={half_ratio_top_text}'
+                    f'PTR={ptr_top_text} | R2={r2_top_text} | half_size_ratio={half_ratio_top_text}\n'
+                    f'rss_fit={rss_fit_top_text} | rss_null={rss_null_top_text} | rss_ratio={rss_ratio_top_text}'
                 )
                 cbar2 = fig2.colorbar(scatter2, ax=ax2)
                 cbar2.set_label('Observed genomic sites in window')
@@ -444,6 +484,12 @@ half_size_ratio = PTR_results[0][7]
 ptr_top50       = PTR_results[0][8]
 r2_fit_top50    = PTR_results[0][9]
 half_size_ratio_top50 = PTR_results[0][10]
+rss_fit = PTR_results[0][11]
+rss_null = PTR_results[0][12]
+rss_ratio = PTR_results[0][13]
+rss_fit_top50 = PTR_results[0][14]
+rss_null_top50 = PTR_results[0][15]
+rss_ratio_top50 = PTR_results[0][16]
 
 qc_passed = (
     total_reads >= int(args.min_read_sum_for_qc)
@@ -467,13 +513,19 @@ rows.append({
     'ptr': ptr,
     'ptr_r2': r2_fit,
     'ptr_half_size_ratio': half_size_ratio,
+    'ptr_rss_fit': rss_fit,
+    'ptr_rss_null': rss_null,
+    'ptr_rss_ratio': rss_ratio,
     'peak_location': peak_location,
     'trough_location': trough_location,
     'peak': peak,
     'trough': trough,
     'ptr_top50pct_sites': ptr_top50,
     'ptr_top50pct_sites_r2': r2_fit_top50,
-    'ptr_top50pct_sites_half_size_ratio': half_size_ratio_top50
+    'ptr_top50pct_sites_half_size_ratio': half_size_ratio_top50,
+    'ptr_top50pct_sites_rss_fit': rss_fit_top50,
+    'ptr_top50pct_sites_rss_null': rss_null_top50,
+    'ptr_top50pct_sites_rss_ratio': rss_ratio_top50
 })
 
 out = pd.DataFrame(rows)
