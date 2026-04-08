@@ -201,15 +201,40 @@ def smoothing_1(
         through = None
         peak_location = None
         through_location = None
+        r2_full = None
+        half_size_ratio_full = None
     else:
         PTR_median = fit_full['ptr']
         peak = fit_full['peak']
         through = fit_full['trough']
         peak_location = fit_full['peak_location']
         through_location = fit_full['trough_location']
+        r2_full = fit_full['r2']
+        half_size_ratio_full = fit_full.get('half_size_ratio')
+
+    # Also compute fit metrics for top-50%-sites windows for machine-readable output.
+    cs_all_series = pd.Series(observed_sites_per_window)
+    site_count_threshold = float(cs_all_series.quantile(0.5))
+    xs_top_all = [x for x, c in zip(xs_all, observed_sites_per_window) if c >= site_count_threshold]
+    ys_top_all = [y for y, c in zip(ys_all, observed_sites_per_window) if c >= site_count_threshold]
+    fit_top_all = fit_piecewise_ptr(xs_top_all, ys_top_all) if len(xs_top_all) >= 6 else None
+
+    ptr_top50 = None if fit_top_all is None else fit_top_all.get('ptr')
+    r2_top50 = None if fit_top_all is None else fit_top_all.get('r2')
+    half_size_ratio_top50 = None if fit_top_all is None else fit_top_all.get('half_size_ratio')
 
     a = [
-        sample_id, PTR_median,peak_location, through_location,peak,through
+        sample_id,
+        PTR_median,
+        peak_location,
+        through_location,
+        peak,
+        through,
+        r2_full,
+        half_size_ratio_full,
+        ptr_top50,
+        r2_top50,
+        half_size_ratio_top50,
     ]
 
     # --- Plotting ---
@@ -231,7 +256,7 @@ def smoothing_1(
             fig, ax = plt.subplots(figsize=(10, 4))
             scatter = ax.scatter(xs, ys, s=12, c=cs, cmap='viridis', alpha=0.85)
 
-            fit_for_plot = fit_piecewise_ptr(xs, ys)
+            fit_for_plot = fit_full
             r2_text = 'NA'
             half_ratio_text = 'NA'
             ptr_text = 'NA'
@@ -280,7 +305,7 @@ def smoothing_1(
                 fig2, ax2 = plt.subplots(figsize=(10, 4))
                 scatter2 = ax2.scatter(xs_top, ys_top, s=12, c=cs_top, cmap='viridis', alpha=0.85)
 
-                fit_top = fit_piecewise_ptr(xs_top, ys_top)
+                fit_top = fit_top_all
                 r2_top_text = 'NA'
                 half_ratio_top_text = 'NA'
                 ptr_top_text = 'NA'
@@ -414,6 +439,11 @@ peak_location   = PTR_results[0][2]
 trough_location = PTR_results[0][3]
 peak            = PTR_results[0][4]
 trough          = PTR_results[0][5]
+r2_fit          = PTR_results[0][6]
+half_size_ratio = PTR_results[0][7]
+ptr_top50       = PTR_results[0][8]
+r2_fit_top50    = PTR_results[0][9]
+half_size_ratio_top50 = PTR_results[0][10]
 
 qc_passed = (
     total_reads >= int(args.min_read_sum_for_qc)
@@ -435,10 +465,15 @@ rows.append({
     'mean_count': mean_count,
     'median_count': median_count,
     'ptr': ptr,
+    'ptr_r2': r2_fit,
+    'ptr_half_size_ratio': half_size_ratio,
     'peak_location': peak_location,
     'trough_location': trough_location,
     'peak': peak,
-    'trough': trough
+    'trough': trough,
+    'ptr_top50pct_sites': ptr_top50,
+    'ptr_top50pct_sites_r2': r2_fit_top50,
+    'ptr_top50pct_sites_half_size_ratio': half_size_ratio_top50
 })
 
 out = pd.DataFrame(rows)
