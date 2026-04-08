@@ -174,7 +174,9 @@ def createSampleInputChannelAndDecideIfToRun2Fast2Q(String samplesheet, String t
             .fromPath(samplesheet)
             .splitCsv(header:false)
             .map { row ->
-                def reads_file = file(row[0])
+                def readsPath = row[0] as String
+                def resolvedReadsPath = readsPath.startsWith('/') ? readsPath : "${projectDir}/${readsPath}"
+                def reads_file = file(resolvedReadsPath)
                 def filename = reads_file.name.replaceFirst(/(?i)(\.(fastq|fq)(\.gz)?|_sequence\.txt\.gz)$/, '')
                 tuple(filename, reads_file)
             }        

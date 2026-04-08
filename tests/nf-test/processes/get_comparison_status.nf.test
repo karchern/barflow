@@ -1,0 +1,67 @@
+nextflow_process {
+
+    name "Process get_comparison_status"
+    tag "fast"
+    script "../../../modules/utils/main.nf"
+    process "get_comparison_status"
+
+    test("writes comparison status table with expected header and rows") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    ['cmp_ok', 'OK', ''],
+                    ['cmp_partial', 'SOME_SAMPLES_MISSING', 'treatments: T3']
+                ]
+                input[1] = 'before_barseq_qc'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out[0].size() == 1
+
+            def outFile = path(process.out[0].get(0))
+            def lines = outFile.readLines()
+
+            assert lines.size() == 3
+            assert lines[0] == 'comparison\tstatus\tstatus_detail'
+            assert lines[1] == 'cmp_ok\tOK\t'
+            assert lines[2] == 'cmp_partial\tSOME_SAMPLES_MISSING\ttreatments: T3'
+        }
+
+    }
+
+    test("renders empty status_detail as empty field, not null") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    ['cmp_null', 'OK', null]
+                ]
+                input[1] = 'after_barseq_qc'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out[0].size() == 1
+
+            def outFile = path(process.out[0].get(0))
+            def lines = outFile.readLines()
+
+            assert lines.size() == 2
+            assert lines[1] == 'cmp_null\tOK\t'
+            assert lines[1].split('\\t').size() == 2 || lines[1].split('\\t').size() == 3
+            def fields = lines[1].split('\\t', -1)
+            assert fields[0] == 'cmp_null'
+            assert fields[1] == 'OK'
+            assert fields[2] == ''
+        }
+
+    }
+}

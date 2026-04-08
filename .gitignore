@@ -2,6 +2,7 @@ work
 results
 test_results
 .nextflow
+.nf-test*
 .*log*
 .conda_cache
 report.html

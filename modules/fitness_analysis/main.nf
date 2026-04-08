@@ -335,9 +335,9 @@ workflow fitness_analysis {
     filter_log_ch    = filtered_step.filter_log_ch
 
 
-    // join filtered matrix + meta for mbarq
-    to_mbarq_data = filtered_mats_ch.join(mbarq_meta_ch)
-    // => [comparison_name, filtered_matrix_path, meta_path]
+      // join filtered matrix + meta for mbarq
+      to_mbarq_data = filtered_mats_ch.join(mbarq_meta_ch)
+      // => [comparison_name, filtered_matrix_path, meta_path]
 
     post_qc_step = post_barcode_filt_qc(
         to_mbarq_data,
