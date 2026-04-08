@@ -71,14 +71,14 @@ workflow barseq_qc_wf {
     // merge barcode_count_sample_metrics
     barseq_qc.out.
          // extract sample_id from [sample_id, counts_path]
-        map { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image -> metrics_path}
+        map { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image, ptr_diag_image_top50 -> metrics_path}
         .toList()
         .set { metrics_paths }
     
     // Based on the barseq_qc output, build a channel of sample_ids that passed QC. We will use this to filter the comparisons.
     sample_ids_passed_ch = barseq_qc.out
-        .filter { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image -> qc_passed.text.trim() == '1' }
-        .map { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image -> sample_id }
+        .filter { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image, ptr_diag_image_top50 -> qc_passed.text.trim() == '1' }
+        .map { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image, ptr_diag_image_top50 -> sample_id }
         .map { sid -> tuple(sid) }
 
     // Join the original counts CHANNEL with the passed-samples channel to get only passing samples
@@ -188,7 +188,7 @@ process barseq_qc {
     val(minimum_median_barcode_count)
 
     output:
-    tuple val(sample_id), path("${sample_id}.barcode_metrics.csv"), path("${sample_id}.passed_qc.txt"), path("${sample_id}.median_of_means_over_genomes.csv"), path("${sample_id}_median_sliding_window.png"), emit: metrics
+    tuple val(sample_id), path("${sample_id}.barcode_metrics.csv"), path("${sample_id}.passed_qc.txt"), path("${sample_id}.median_of_means_over_genomes.csv"), path("${sample_id}_median_sliding_window.png"), path("${sample_id}_median_sliding_window_top50pct_sites.png"), emit: metrics
 
     """
     barseq_qc.py \

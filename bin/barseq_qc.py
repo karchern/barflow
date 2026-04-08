@@ -15,8 +15,9 @@ def smoothing_1(
     moving_mean_array = []
     sufficient_coverage = 0
     bin_centers = []
+    observed_sites_per_window = []
 
-    step = 100
+    step = window
     if position_count_df.empty:
         print("Total number of bins: 0")
         print("The number of bins with sufficient mapped reads: 0")
@@ -65,6 +66,7 @@ def smoothing_1(
 
         moving_mean_array.append(moving_mean)
         bin_centers.append(start + (window / 2))
+        observed_sites_per_window.append(running_n)
             
     print(f"Total number of bins: {total_bins}")
     print(f"The number of bins with sufficient mapped reads: {sufficient_coverage}")
@@ -89,16 +91,20 @@ def smoothing_1(
 
         xs = []
         ys = []
+        cs = []
         for ii, val in enumerate(moving_mean_array):
             xs.append(int(bin_centers[ii]))
             ys.append(val)
+            cs.append(int(observed_sites_per_window[ii]))
 
         if xs and ys:
             fig, ax = plt.subplots(figsize=(10, 4))
-            ax.scatter(xs, ys, s=8, color='C0', alpha=0.8)
+            scatter = ax.scatter(xs, ys, s=12, c=cs, cmap='viridis', alpha=0.85)
             ax.set_xlabel('Genomic position (bp)')
             ax.set_ylabel('Sliding-window mean coverage')
             ax.set_title(f'{sample_id} sliding_window_mean (PTR=NA)')
+            cbar = fig.colorbar(scatter, ax=ax)
+            cbar.set_label('Observed genomic sites in window')
             if peak_location is not None:
                 ax.axvline(peak_location, color='C1', linestyle='--', label='peak')
             if through_location is not None:
@@ -110,6 +116,29 @@ def smoothing_1(
             fig.savefig(outfn, dpi=150)
             plt.close(fig)
             print(f'Saved sliding-window mean plot to {outfn}')
+
+            # 2nd version: keep only windows in the top 50th percentile of observed site counts
+            cs_series = pd.Series(cs)
+            site_count_threshold = float(cs_series.quantile(0.5))
+            xs_top = [x for x, c in zip(xs, cs) if c >= site_count_threshold]
+            ys_top = [y for y, c in zip(ys, cs) if c >= site_count_threshold]
+            cs_top = [c for c in cs if c >= site_count_threshold]
+
+            if xs_top and ys_top:
+                fig2, ax2 = plt.subplots(figsize=(10, 4))
+                scatter2 = ax2.scatter(xs_top, ys_top, s=12, c=cs_top, cmap='viridis', alpha=0.85)
+                ax2.set_xlabel('Genomic position (bp)')
+                ax2.set_ylabel('Sliding-window mean coverage')
+                ax2.set_title(f'{sample_id} sliding_window_mean top50pct_sites (PTR=NA)')
+                cbar2 = fig2.colorbar(scatter2, ax=ax2)
+                cbar2.set_label('Observed genomic sites in window')
+                outfn2 = f'{sample_id}_median_sliding_window_top50pct_sites.png'
+                plt.tight_layout()
+                fig2.savefig(outfn2, dpi=150)
+                plt.close(fig2)
+                print(f'Saved top-50pct-sites sliding-window mean plot to {outfn2}')
+            else:
+                print('No windows passed top-50pct-sites filter for second plot')
         else:
             print('No valid points to plot for moving_mean_array')
     except Exception as e:
