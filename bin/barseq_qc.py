@@ -2,11 +2,10 @@
 import pandas as pd
 from pathlib import Path
 import argparse
-import statistics
 
 # Code was adapted from https://github.com/alipirani88/Growth-rate-estimate/blob/master/modules/generate_PTR_dataframe.py
 def smoothing_1(
-    read_counts: list, 
+    position_count_df: pd.DataFrame,
     window,
     logger, 
     Config,
@@ -15,107 +14,67 @@ def smoothing_1(
 
     moving_mean_array = []
     sufficient_coverage = 0
+    bin_centers = []
 
     step = 100
-    median_of_medians_size = 10000
-    ll = list(range(0, len(read_counts) - window + 1, step))
-
-    if not ll:
+    if position_count_df.empty:
         print("Total number of bins: 0")
-        print("The number of bins with no mapped reads: 0")
-        return
+        print("The number of bins with sufficient mapped reads: 0")
+        return [[sample_id, None, None, None, None, None], ""]
 
-    total_bins = len(ll)
+    position_count_df = position_count_df.sort_values('position').reset_index(drop=True)
+    min_pos = int(position_count_df['position'].min())
+    max_pos = int(position_count_df['position'].max())
 
-    # initialise first window
-    first_start = ll[0]
-    first_end = first_start + window
-    zeros_in_window = read_counts[first_start:first_end].count(0)
+    # Slide window along genomic coordinates, not over a dense per-bp array.
+    window_starts = list(range(min_pos, max_pos + 1, step))
 
-    for idx, i in enumerate(ll):
-        start = i
+    if not window_starts:
+        print("Total number of bins: 0")
+        print("The number of bins with sufficient mapped reads: 0")
+        return [[sample_id, None, None, None, None, None], ""]
+
+    total_bins = len(window_starts)
+
+    positions = position_count_df['position'].tolist()
+    counts = position_count_df['count'].tolist()
+
+    left_idx = 0
+    right_idx = 0
+    running_sum = 0.0
+    running_n = 0
+
+    for start in window_starts:
         end = start + window
 
-        # update zeros_in_window when window moves
-        if idx > 0:
-            # element leaving at start-step
-            left_idx = start - step
-            right_idx = end - 1
-            # subtract zeros that left
-            for j in range(left_idx, left_idx + step):
-                if read_counts[j] == 0:
-                    zeros_in_window -= 1
-            # add zeros that entered
-            for j in range(end - step, end):
-                if j < len(read_counts) and read_counts[j] == 0:
-                    zeros_in_window += 1
+        while right_idx < len(positions) and positions[right_idx] < end:
+            running_sum += counts[right_idx]
+            running_n += 1
+            right_idx += 1
 
-        # all zeros in this window?
-        if zeros_in_window < (0.01*(window)):
+        while left_idx < len(positions) and positions[left_idx] < start:
+            running_sum -= counts[left_idx]
+            running_n -= 1
+            left_idx += 1
+
+        if running_n > 0:
+            moving_mean = running_sum / running_n
             sufficient_coverage += 1
-        # Do NOT use the median here - especially if you work with mariner transposon data the median of a genomic window will almost certainly be all 0s. 
-        # Unless you supply only TA site to the PTR calculation function, in which case the median of medians should work just fine. 
-        # But for now, to be more general, we will use the mean for the first level of smoothing and then take the median of means for the second level of smoothing to be more robust to outliers.
-        #moving_mean_array.append(statistics.mean(read_counts[start:end])) 
-        moving_mean_array.append(sum(read_counts[start:end])/len(read_counts[start:end])) 
+        else:
+            moving_mean = 0.0
+
+        moving_mean_array.append(moving_mean)
+        bin_centers.append(start + (window / 2))
             
     print(f"Total number of bins: {total_bins}")
     print(f"The number of bins with sufficient mapped reads: {sufficient_coverage}")
 
-    ## Step 3
-    median_sliding_window_array = []
-    for i in range(0, len(moving_mean_array), 1):
-        start = i
-        end = i + median_of_medians_size
-        if len(moving_mean_array[start:end]) > (median_of_medians_size/2):
-            #median_sliding_window_array.append(statistics.median(moving_mean_array[start:end]))
-            median_sliding_window_array.append(
-                sum(moving_mean_array[start:end])/len(moving_mean_array[start:end])
-            )
-        else:
-            median_sliding_window_array.append(None)
-
-    ## Step 4
-    peak = max([x for x in median_sliding_window_array if x is not None])  # ignore None
-    peak_index = median_sliding_window_array.index(peak)
-    if all([(x == 0 or x == None) for x in median_sliding_window_array]):
-        #print("All median sliding window values are 0. Cannot calculate PTR.")
-        #return
-        through = 1
-        through_index = None
-    else:
-        through = min([x for x in median_sliding_window_array if x !=0 and x is not None])  # ignore None and 0
-        through_index = median_sliding_window_array.index(through)
-    PTR_median = peak/through
-
-    # Plot median_sliding_window as a line plot and save to file. Use matplotlib
-
-    # remove interactive breakpoint; produce a PNG of the median sliding window
-    
-    def second_level_index_to_genomic_position(idx, ll, step, median_of_medians_size, window):
-            if idx is None:
-                return None
-
-            if idx >= len(ll):
-                return None
-
-            start_bp = ll[idx]
-
-            # approximate center of second-level smoothing region
-            center_offset = ((median_of_medians_size - 1) * step) / 2
-
-            # optional: add half the first-level window width to refer to window center
-            center_bp = start_bp + center_offset + (window / 2)
-
-            return int(center_bp)
-
-    peak_location = second_level_index_to_genomic_position(
-        peak_index, ll, step, median_of_medians_size, window
-    )
-
-    through_location = second_level_index_to_genomic_position(
-        through_index, ll, step, median_of_medians_size, window
-    )
+    # PTR and peak/trough inference are intentionally disabled for now.
+    PTR_median = None
+    peak = None
+    through = None
+    peak_location = None
+    through_location = None
 
     a = [
         sample_id, PTR_median,peak_location, through_location,peak,through
@@ -130,21 +89,16 @@ def smoothing_1(
 
         xs = []
         ys = []
-        for ii, val in enumerate(median_sliding_window_array):
-            pos = second_level_index_to_genomic_position(
-                ii, ll, step, median_of_medians_size, window
-            )
-            if pos is None or val is None:
-                continue
-            xs.append(pos)
+        for ii, val in enumerate(moving_mean_array):
+            xs.append(int(bin_centers[ii]))
             ys.append(val)
 
         if xs and ys:
             fig, ax = plt.subplots(figsize=(10, 4))
-            ax.plot(xs, ys, linewidth=1, color='C0')
+            ax.scatter(xs, ys, s=8, color='C0', alpha=0.8)
             ax.set_xlabel('Genomic position (bp)')
-            ax.set_ylabel('Median of means (counts)')
-            ax.set_title(f'{sample_id} median_sliding_window (PTR={PTR_median:.2f})')
+            ax.set_ylabel('Sliding-window mean coverage')
+            ax.set_title(f'{sample_id} sliding_window_mean (PTR=NA)')
             if peak_location is not None:
                 ax.axvline(peak_location, color='C1', linestyle='--', label='peak')
             if through_location is not None:
@@ -155,19 +109,17 @@ def smoothing_1(
             plt.tight_layout()
             fig.savefig(outfn, dpi=150)
             plt.close(fig)
-            print(f'Saved median sliding window plot to {outfn}')
+            print(f'Saved sliding-window mean plot to {outfn}')
         else:
-            print('No valid points to plot for median_sliding_window_array')
+            print('No valid points to plot for moving_mean_array')
     except Exception as e:
-        print(f'Could not create median sliding window plot: {e}')
+        print(f'Could not create sliding-window mean plot: {e}')
 
     b = []
     header = "bin,bin_genomic_center,count\n"
     count = 0
-    for ii, i in enumerate(median_sliding_window_array):
-        bin_genomic_center = second_level_index_to_genomic_position(
-            ii, ll, step, median_of_medians_size, window
-        )
+    for ii, i in enumerate(moving_mean_array):
+        bin_genomic_center = int(bin_centers[ii])
         count += 1
         b.append(sample_id+','+str(count)+','+str(bin_genomic_center)+','+str(i)+'\n')
     b = ''.join(b)
@@ -232,20 +184,12 @@ df_with_good_barcodes_and_contigs_summed_by_pos = (
     .groupby('position', as_index=True)['count']
     .sum()
     .to_frame('count')
+    .reset_index()
 )
-
-ally = pd.DataFrame(
-    list(range(0, int(df_with_good_barcodes_and_contigs['position'].max()) + 1)), columns = ['position']
-)
-ally['count_dummy'] = 0
-ally = ally.merge(df_with_good_barcodes_and_contigs_summed_by_pos, on='position', how='left').fillna(0)
-ally['count'] = ally['count'] + ally['count_dummy']
-ally.drop(columns=['count_dummy'], inplace=True)
-ally.sort_values('position', inplace=True)
 
 PTR_results = smoothing_1(
-    read_counts=ally['count'].tolist(),
-    window=50000,
+    position_count_df=df_with_good_barcodes_and_contigs_summed_by_pos,
+    window=10000,
     logger=None,
     Config=None,
     sample_id=args.sample_id
