@@ -31,6 +31,7 @@ process merge_barcode_matrices {
     tuple val(comparison_name), path("${comparison_name}.merged.barcode.matrices.csv.gz"), emit: merged_matrices_ch
     tuple val(comparison_name), path("treatments.tsv"), emit: treatments_ch
     tuple val(comparison_name), path("controls.tsv"), emit: controls_ch
+    tuple val(comparison_name), path(good_barcodes_file), emit: good_barcodes_ch
 
 
     // step-specific log
@@ -67,7 +68,7 @@ process generate_mbarq_meta {
 
 
     tag { comparison_name }
-    publishDir "${params.outdir}/comparisons", mode: 'copy'
+    publishDir "${params.outdir}/comparisons/${comparison_name}", mode: 'copy'
 
 
     input:
@@ -234,7 +235,7 @@ process plot_volcano_plots {
 
     tag { comparison_name }
     label 'r_basic'
-    publishDir "${params.outdir}/mbarq_analysis/${comparison_name}", mode: 'copy'
+    publishDir "${params.outdir}/comparisons/${comparison_name}", mode: 'copy'
 
 
     input:
@@ -255,13 +256,50 @@ process plot_volcano_plots {
 }
 
 
+process visualize_chromosomal_fc_bias {
+
+
+    tag { comparison_name }
+    label 'python_basic'
+    publishDir "${params.outdir}/comparisons/${comparison_name}", mode: 'copy'
+
+
+    input:
+    tuple val(comparison_name),
+          path(mbarq_barcodes_results),
+          path(good_barcodes_file)
+
+
+    output:
+    tuple val(comparison_name),
+          path("${comparison_name}.chromosomal_fc_bias.png"),
+          emit: fc_bias_plot_ch
+    
+    tuple val(comparison_name),
+          path("${comparison_name}.chromosomal_fc_bias.csv"),
+          emit: fc_bias_data_ch
+
+
+    script:
+    """
+    visualize_chromosomal_fc_bias.py \
+      --mbarq-barcodes-results ${mbarq_barcodes_results} \
+      --good-barcodes ${good_barcodes_file} \
+      --comparison-id ${comparison_name} \
+      --window 10000 \
+      --output-plot ${comparison_name}.chromosomal_fc_bias.png \
+      --output-data ${comparison_name}.chromosomal_fc_bias.csv
+    """
+}
+
+
 
 process merge_logs {
 
 
     tag { comparison_name }
-    // One folder per comparison under mbarq
-    publishDir "${params.outdir}/mbarq/${comparison_name}", mode: 'copy'
+    // One folder per comparison under comparisons
+    publishDir "${params.outdir}/comparisons/${comparison_name}", mode: 'copy'
 
 
     input:
@@ -359,6 +397,17 @@ workflow fitness_analysis {
     to_volcano = mbarq_rra_results
     volcano_plots = plot_volcano_plots(
         to_volcano
+    )
+
+    // Prepare data for chromosomal FC bias visualization
+    mbarq_bc_results = mbarq_results.mbarq_barcodes_results  // (comparison_name, path)
+    good_bc_ch = mr.good_barcodes_ch  // (comparison_name, path)
+    
+    to_fc_bias = mbarq_bc_results.join(good_bc_ch)
+    // => [comparison_name, mbarq_barcodes_results, good_barcodes_file]
+    
+    fc_bias_plots = visualize_chromosomal_fc_bias(
+        to_fc_bias
     )
 
 
