@@ -66,19 +66,31 @@ workflow barseq_qc_wf {
 
     // Run per-sample BarSeq QC using the channel of counts
     // all_counts_with_good_barcodes_and_contigs_and_position_ch also contains the sample_goodbarcodes_contig_map and library info - so retain the info
-    barseq_qc(all_counts_with_good_barcodes_and_contigs_and_position_ch, params.minimum_read_sum_for_qc, params.minimum_median_barcode_count)
+    if( params.enable_ptr_correction ) {
+        log.warn "PTR barcode correction is ENABLED. Barcodes will be corrected towards trough when fit-quality gates pass."
+    }
+    else {
+        log.warn "PTR barcode correction is DISABLED via --enable_ptr_correction false. Raw barcode counts will be used."
+    }
+
+    barseq_qc(
+        all_counts_with_good_barcodes_and_contigs_and_position_ch,
+        params.minimum_read_sum_for_qc,
+        params.minimum_median_barcode_count,
+        params.enable_ptr_correction
+    )
 
     // merge barcode_count_sample_metrics
     barseq_qc.out.
          // extract sample_id from [sample_id, counts_path]
-        map { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image, ptr_diag_image_top50 -> metrics_path}
+        map { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image_uncorrected, ptr_diag_image_corrected -> metrics_path}
         .toList()
         .set { metrics_paths }
     
     // Based on the barseq_qc output, build a channel of sample_ids that passed QC. We will use this to filter the comparisons.
     sample_ids_passed_ch = barseq_qc.out
-        .filter { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image, ptr_diag_image_top50 -> qc_passed.text.trim() == '1' }
-        .map { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image, ptr_diag_image_top50 -> sample_id }
+        .filter { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image_uncorrected, ptr_diag_image_corrected -> qc_passed.text.trim() == '1' }
+        .map { sample_id, metrics_path, qc_passed, median_of_medians, ptr_diag_image_uncorrected, ptr_diag_image_corrected -> sample_id }
         .map { sid -> tuple(sid) }
 
     // Join the original counts CHANNEL with the passed-samples channel to get only passing samples
@@ -169,7 +181,7 @@ process collate_barseq_qc_results {
     #Take header from first file, saver than this shit above :)
     header=\$(head -n 1 ${metrics_file_paths[0]})
     echo "\$header" > all_samples.barcode_metrics.tsv
-    for f in *.csv; do
+    for f in ${metrics_file_paths.join(' ')}; do
         tail -n +2 "\$f" >> all_samples.barcode_metrics.tsv
     done
     """
@@ -186,9 +198,10 @@ process barseq_qc {
     tuple val(sample_id), path(counts_path), path(sample_goodbarcodes_contig_position_map), val(library)
     val(minimum_read_sum_for_qc)
     val(minimum_median_barcode_count)
+    val(enable_ptr_correction)
 
     output:
-    tuple val(sample_id), path("${sample_id}.barcode_metrics.csv"), path("${sample_id}.passed_qc.txt"), path("${sample_id}.median_of_means_over_genomes.csv"), path("${sample_id}_median_sliding_window.png"), path("${sample_id}_median_sliding_window_top50pct_sites.png"), emit: metrics
+    tuple val(sample_id), path("${sample_id}.barcode_metrics.csv"), path("${sample_id}.passed_qc.txt"), path("${sample_id}.median_of_means_over_genomes.csv"), path("${sample_id}_median_sliding_window_uncorrected.png"), path("${sample_id}_median_sliding_window_corrected.png"), emit: metrics
 
     """
     barseq_qc.py \
@@ -198,6 +211,7 @@ process barseq_qc {
         --output_barcode_metrics ${sample_id}.barcode_metrics.csv \
         --output_median_of_means_over_genomes ${sample_id}.median_of_means_over_genomes.csv \
         --output_passed ${sample_id}.passed_qc.txt \
+        --enable_ptr_correction ${enable_ptr_correction} \
         --min_read_sum_for_qc ${minimum_read_sum_for_qc} \
         --min_median_barcode_count ${minimum_median_barcode_count}
     """
