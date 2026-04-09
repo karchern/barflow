@@ -1,0 +1,37 @@
+nextflow_process {
+
+    name "Process print_summary_table"
+    tag "fast"
+    script "../../../modules/barseq_qc/main.nf"
+    process "print_summary_table"
+
+    test("prints expected summary metrics") {
+
+        when {
+            process {
+                """
+                input[0] = 4
+                input[1] = 3
+                input[2] = 2
+                input[3] = 1
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def stdout = process.stdout.join('\n')
+            assert stdout.contains('Pre-mbarq numbers')
+            assert stdout.contains('BarSeq samples before QC')
+            assert stdout.contains('BarSeq samples after QC')
+            assert stdout.contains('Comparisons before filtering')
+            assert stdout.contains('Comparisons after filtering')
+            assert stdout.contains('|        4 |')
+            assert stdout.contains('|        3 |')
+            assert stdout.contains('|        2 |')
+            assert stdout.contains('|        1 |')
+        }
+
+    }
+}

@@ -1,0 +1,9 @@
+name: barflow-nf-test
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - openjdk=17
+  - nextflow
+  - nf-test

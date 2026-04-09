@@ -4,6 +4,28 @@
 
 with Nextflow installed, run `bash test_run.sh` to run pipeline with dummy data. 
 
+## nf-test process tests
+
+This repository includes basic process-level tests using nf-test.
+
+Install nf-test (example via mamba):
+
+```bash
+mamba install -c bioconda -c conda-forge nf-test
+```
+
+Run all nf-test suites:
+
+```bash
+nf-test test
+```
+
+Run only process tests:
+
+```bash
+nf-test test tests/nf-test/processes
+```
+
 ## Input Logic:
 
 This pipeline assumes you have already characterized your input library and have a list of reliable barcodes (typically those of sufficient abundance + evidence of single integration in initial library).

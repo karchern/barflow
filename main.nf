@@ -67,7 +67,11 @@ workflow {
 
     sample_goodbarcodes_library_map = Channel.fromPath(params.sample_goodbarcodes_library_map)
                                       .splitCsv(header:false)
-                                      .map { row -> tuple(row[0], file(row[1]), row[2]) } //TODO: This can be moved into the conditional statement - but I have a pipeline running so don't want to mess things up
+                                      .map { row ->
+                                          def mapPath = row[1] as String
+                                          def resolvedMapPath = mapPath.startsWith('/') ? mapPath : "${projectDir}/${mapPath}"
+                                          tuple(row[0], file(resolvedMapPath), row[2])
+                                      } //TODO: This can be moved into the conditional statement - but I have a pipeline running so don't want to mess things up
 
     input_info = createSampleInputChannelAndDecideIfToRun2Fast2Q(
         params.samplesheet,

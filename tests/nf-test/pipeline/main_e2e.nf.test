@@ -1,0 +1,38 @@
+nextflow_pipeline {
+
+    name "Pipeline E2E snapshot check"
+    tag "e2e"
+    script "../../../main.nf"
+
+    test("runs test_run inputs and snapshots key outputs") {
+
+        when {
+            params {
+                test_run = true
+                samplesheet = "${projectDir}/test_data/test_samplesheet.csv"
+                sample_goodbarcodes_library_map = "${projectDir}/test_data/sample_goodbarcodesfile_map.csv"
+                comparisons = "${projectDir}/test_data/comparisons.json"
+                outdir = "${projectDir}/tests/results/e2e"
+                singularity = false
+                conda = true
+                stop_after_barcode_extraction = false
+                minimum_read_sum_for_qc = 6
+                minimum_median_barcode_count = 0
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def comparisonName = "explicit_syntax"
+            def rra = path("${params.outdir}/mbarq_results/${comparisonName}/${comparisonName}.filtered.merged.barcode.matrices.csv_rra_results.csv")
+            def filtered = path("${params.outdir}/barcode_matrices_filtered/${comparisonName}.filtered.merged.barcode.matrices.csv.gz")
+
+            assert rra.exists()
+            assert filtered.exists()
+
+            assert snapshot(rra).match("rra_results_${comparisonName}")
+            assert snapshot(filtered).match("filtered_matrix_${comparisonName}")
+        }
+    }
+}
