@@ -66,34 +66,10 @@ all_data_reduced <-
     )
 
 good_barcodes_with_locustag <- read_csv(good_barcodes_csv_path, col_names = TRUE)
-
-# Accept both headered and headerless good_barcodes files.
-# Headerless files are interpreted as: #Feature,locus_tag,(optional contig,position).
-if (!("#Feature" %in% names(good_barcodes_with_locustag)) &&
-    !("locus_tag" %in% names(good_barcodes_with_locustag)) &&
-    ncol(good_barcodes_with_locustag) >= 2) {
-    good_barcodes_with_locustag <- read_csv(
-        good_barcodes_csv_path,
-        col_names = FALSE,
-        show_col_types = FALSE
-    )
-}
-
-if (!("#Feature" %in% names(good_barcodes_with_locustag))) {
-    colnames(good_barcodes_with_locustag)[1] <- "#Feature"
-}
-if (!("locus_tag" %in% names(good_barcodes_with_locustag)) && ncol(good_barcodes_with_locustag) >= 2) {
-    colnames(good_barcodes_with_locustag)[2] <- "locus_tag"
-}
-if (!("contig" %in% names(good_barcodes_with_locustag)) && ncol(good_barcodes_with_locustag) >= 3) {
-    colnames(good_barcodes_with_locustag)[3] <- "contig"
-}
-if (!("position" %in% names(good_barcodes_with_locustag)) && ncol(good_barcodes_with_locustag) >= 4) {
-    colnames(good_barcodes_with_locustag)[4] <- "position"
-}
+colnames(good_barcodes_with_locustag)[1] <- "#Feature"
 
 all_data_reduced <- all_data_reduced %>%
     left_join(good_barcodes_with_locustag, by = "#Feature") %>%
-    relocate(any_of(c("#Feature", "locus_tag", "contig", "position")))
+    relocate(`#Feature`, locus_tag, contig, position)
 
 write_csv(all_data_reduced, output_file)

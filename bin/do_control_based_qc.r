@@ -9,7 +9,7 @@ compute_pre_mbarq_qc <- function(
 
 data <- read_csv(mbarq_results_path) %>%
   pivot_longer(
-    cols = -any_of(c("#Feature", "locus_tag", "contig", "position")),
+    cols = -c(`#Feature`, locus_tag, contig, position),
     names_to = "sampleID",
     values_to = "barcode_count"
   ) %>%
