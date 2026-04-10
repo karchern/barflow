@@ -514,6 +514,14 @@ qc_passed = (
     and median_count >= int(args.min_median_barcode_count)
 )
 
+qc_failure_reasons = []
+if total_reads < int(args.min_read_sum_for_qc):
+    qc_failure_reasons.append('total_reads_below_threshold')
+if median_count < int(args.min_median_barcode_count):
+    qc_failure_reasons.append('median_barcode_count_below_threshold')
+
+qc_failure_reason = ';'.join(qc_failure_reasons) if qc_failure_reasons else ''
+
 if qc_passed:
     with open(args.output_passed, 'w') as f:
         f.write('1')
@@ -523,6 +531,10 @@ else:
 
 rows.append({
     'sample_id': args.sample_id,
+    'qc_passed': int(qc_passed),
+    'qc_failure_reason': qc_failure_reason,
+    'qc_min_read_sum_threshold': int(args.min_read_sum_for_qc),
+    'qc_min_median_barcode_count_threshold': int(args.min_median_barcode_count),
     'total_reads': total_reads,
     'n_barcodes_detected': n_barcodes_detected,
     'max_count': max_count,

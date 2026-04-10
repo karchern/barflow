@@ -105,7 +105,14 @@ workflow barseq_qc_wf {
     comparison_validation_log_post_qc = validate_comparisons_post_qc(comparisons_status_post_filter_list, "after_barseq_qc")
 
     // Publish merged BarSeq sample QC metrics
-    collate_barseq_qc_results(metrics_paths)
+    collated_qc_results = collate_barseq_qc_results(metrics_paths)
+
+    comparison_trace_outputs = trace_comparison_filtering(
+        collated_qc_results.sample_wise_qc_metrics,
+        file(params.comparisons),
+        params.minimum_read_sum_for_qc,
+        params.minimum_median_barcode_count
+    )
 
     comparisons_status_post_filter_PASSED_list = comparisons_status_post_filter_list
         .flatMap { it }
@@ -125,10 +132,19 @@ workflow barseq_qc_wf {
         comparisons_status_post_filter_PASSED_list
     )
 
+    comparison_trace_outputs.summary_txt
+        .view { summary_path ->
+            summary_path.text
+        }
+
     emit:
     fitness_analysis_input
     comparison_validation_log_pre_qc
     comparison_validation_log_post_qc
+    comparison_trace_tsv = comparison_trace_outputs.comparison_trace_tsv
+    comparison_sample_trace_tsv = comparison_trace_outputs.comparison_sample_trace_tsv
+    comparison_drop_reason_counts_tsv = comparison_trace_outputs.drop_reason_counts_tsv
+    comparison_trace_summary_txt = comparison_trace_outputs.summary_txt
 
 }
 
@@ -188,6 +204,38 @@ process collate_barseq_qc_results {
 
 }
 
+process trace_comparison_filtering {
+
+    label 'python_basic'
+
+    publishDir "${params.outdir}/comparisons_status/", mode: 'copy', overwrite: true
+
+    input:
+    path sample_wise_qc_metrics
+    path comparisons_json
+    val minimum_read_sum_for_qc
+    val minimum_median_barcode_count
+
+    output:
+    path("comparison_trace.tsv"), emit: comparison_trace_tsv
+    path("comparison_sample_trace.tsv"), emit: comparison_sample_trace_tsv
+    path("comparison_drop_reason_counts.tsv"), emit: drop_reason_counts_tsv
+    path("comparison_trace_summary.txt"), emit: summary_txt
+
+    script:
+    """
+    trace_comparison_filtering.py \
+        --comparisons-json ${comparisons_json} \
+        --sample-metrics ${sample_wise_qc_metrics} \
+        --min-read-sum-for-qc ${minimum_read_sum_for_qc} \
+        --min-median-barcode-count ${minimum_median_barcode_count} \
+        --output-comparison-trace comparison_trace.tsv \
+        --output-comparison-sample-trace comparison_sample_trace.tsv \
+        --output-drop-reason-counts comparison_drop_reason_counts.tsv \
+        --output-summary-text comparison_trace_summary.txt
+    """
+}
+
 process barseq_qc {
 
     label 'python_basic_quick_process'
@@ -242,3 +290,5 @@ process print_summary_table {
         ============================================
         """.stripIndent()
 }
+
+// Summary is printed via channel view in barseq_qc_wf.
