@@ -403,12 +403,17 @@ parser.add_argument('--min_read_sum_for_qc', type=int, help="Minimum total read 
 parser.add_argument('--min_median_barcode_count', type=int, help="Minimum median barcode count for sample to pass QC.")
 parser.add_argument('--enable_ptr_correction', type=parse_bool, default=True, help="Enable PTR-based per-barcode correction before positional aggregation.")
 
+parser.add_argument('--output_corrected_counts', type=str, required=True, help="Output corrected counts file in 2fast2q format.")
+
 args = parser.parse_args()
 counts_file_path = args.input_counts
 
 rows = []
 counts_file_path = Path(counts_file_path)
-df = pd.read_csv(counts_file_path, sep=',')
+df_raw = pd.read_csv(counts_file_path, sep=',')
+original_feature_col = df_raw.columns[0]  # e.g. '#Feature'
+original_count_col   = df_raw.columns[1]  # e.g. the sample name
+df = df_raw.copy()
 df.columns = ['barcode', 'count']
 
 df_with_good_barcodes_and_contigs = df.join(pd.read_csv(args.sample_goodbarcodes_contig_position_map, sep=',').set_index('barcode'), on='barcode', how='inner')
@@ -490,6 +495,12 @@ PTR_results = smoothing_1(
 
 with open(args.output_median_of_means_over_genomes, 'w') as f:
     f.write(str(PTR_results[1]))
+
+# Write the PTR-corrected counts (good barcodes only) in the original 2fast2q column format
+corrected_out = df_with_good_barcodes_and_contigs_corrected[['barcode', 'count']].copy()
+corrected_out['count'] = corrected_out['count'].round().astype(int)
+corrected_out.columns = [original_feature_col, original_count_col]
+corrected_out.to_csv(args.output_corrected_counts, index=False)
 
 
 total_reads     = int(df['count'].sum())
