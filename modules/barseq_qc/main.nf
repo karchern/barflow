@@ -137,11 +137,6 @@ workflow barseq_qc_wf {
         comparisons_status_post_filter_PASSED_list
     )
 
-    comparison_trace_outputs.summary_txt
-        .view { summary_path ->
-            summary_path.text
-        }
-
     emit:
     fitness_analysis_input
     comparison_validation_log_pre_qc
@@ -296,5 +291,3 @@ process print_summary_table {
         ============================================
         """.stripIndent()
 }
-
-// Summary is printed via channel view in barseq_qc_wf.
