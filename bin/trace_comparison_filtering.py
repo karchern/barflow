@@ -1,60 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
-import fnmatch
 import json
 from collections import Counter, defaultdict
 
 import pandas as pd
 
-
-def as_string_list(value):
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return [str(v) for v in value]
-    return [str(value)]
-
-
-def match_selectors(selectors, all_ids):
-    matched = set()
-    explicit_not_found = []
-
-    for selector in selectors:
-        if '*' in selector or '?' in selector:
-            matched.update(fnmatch.filter(all_ids, selector))
-        else:
-            if selector in all_ids:
-                matched.add(selector)
-            else:
-                explicit_not_found.append(selector)
-
-    return sorted(matched), sorted(explicit_not_found)
-
-
-def resolve_selectors(selectors, all_ids, negative_selectors=None):
-    negative_selectors = negative_selectors or []
-
-    positive_ids, explicit_not_found = match_selectors(selectors, all_ids)
-    negative_ids, negative_explicit_not_found = match_selectors(negative_selectors, all_ids)
-
-    resolved = sorted(set(positive_ids) - set(negative_ids))
-    excluded_by_negative_selection = sorted(set(positive_ids) & set(negative_ids))
-
-    return {
-        'resolved_ids': resolved,
-        'explicit_not_found': explicit_not_found,
-        'negative_explicit_not_found': negative_explicit_not_found,
-        'excluded_by_negative_selection': excluded_by_negative_selection,
-    }
-
-
-def derive_status(treat_ids, control_ids):
-    if treat_ids and control_ids:
-        return 'OK'
-    if not treat_ids and not control_ids:
-        return 'ALL_SAMPLES_MISSING'
-    return 'SOME_SAMPLES_MISSING'
+from comparison_filtering_logic import as_string_list, derive_status, resolve_selectors
 
 
 def derive_drop_reason(pre_treat, pre_ctrl, post_treat, post_ctrl):
