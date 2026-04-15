@@ -1,6 +1,7 @@
 work
 results
 test_results
+tests/results
 .nextflow
 .nf-test*
 .*log*
@@ -9,4 +10,6 @@ report.html
 timeline.html
 trace.txt
 PROCESS_STUFF/*
+tests/nf-test-e2e-*.out
+tests/nf-test-e2e-*.err
 raw_data/*

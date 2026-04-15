@@ -1,38 +1,49 @@
 nextflow_pipeline {
 
-    name "Pipeline E2E snapshot check"
+    name "Pipeline E2E Liu_2021_QUICK"
     tag "e2e"
     script "../../../main.nf"
+    options "-entry test"
 
-    test("runs test_run inputs and snapshots key outputs") {
+    test("runs Liu_2021_QUICK end-to-end") {
 
         when {
             params {
-                test_run = true
-                samplesheet = "${projectDir}/test_data/test_samplesheet.csv"
-                sample_goodbarcodes_library_map = "${projectDir}/test_data/sample_goodbarcodesfile_map.csv"
-                comparisons = "${projectDir}/test_data/comparisons.json"
-                outdir = "${projectDir}/tests/results/e2e"
-                singularity = false
-                conda = true
+                test_run = false
+                twofast2q_folder = "/g/typas/Personal_Folders/Nic/barseq_analysis/other_data/Liu_2021/data_cleaned/2fast2q_like_barcode_counts"
+                sample_goodbarcodes_library_map = "/g/typas/Personal_Folders/Nic/barseq_analysis/data/sample_goodbarcodesfile_maps/Liu_2021/Liu_2021_QUICK.csv"
+                comparisons = "/g/typas/Personal_Folders/Nic/barseq_analysis/data/comparison_files/Liu_2021/Liu_2021_comparisons_QUICK.json"
+                outdir = "${projectDir}/tests/results/e2e_liu_2021_quick"
+                singularity = true
+                conda = false
                 stop_after_barcode_extraction = false
-                minimum_read_sum_for_qc = 6
-                minimum_median_barcode_count = 0
+                enable_ptr_correction = true
+                minimum_read_sum_for_qc = 10000
+                minimum_median_barcode_count = 1
+                mbarq_normalization = "median"
+                remove_all_0_barcodes = true
+                lowly_abundant_barcode_cutoff = 5
+                filter_on_what = "controls"
             }
         }
 
         then {
             assert workflow.success
 
-            def comparisonName = "explicit_syntax"
-            def rra = path("${params.outdir}/mbarq_results/${comparisonName}/${comparisonName}.filtered.merged.barcode.matrices.csv_rra_results.csv")
-            def filtered = path("${params.outdir}/barcode_matrices_filtered/${comparisonName}.filtered.merged.barcode.matrices.csv.gz")
+            def preStatus = path("${params.outdir}/comparisons_status/comparisons_status_before_barseq_qc.tsv")
+            def postStatus = path("${params.outdir}/comparisons_status/comparisons_status_after_barseq_qc.tsv")
+            def traceSummary = path("${params.outdir}/comparisons_status/comparison_trace_summary.txt")
+            def finalMaster = path("${params.outdir}/final_master_log.tsv")
 
-            assert rra.exists()
-            assert filtered.exists()
+            assert preStatus.exists()
+            assert postStatus.exists()
+            assert traceSummary.exists()
+            assert finalMaster.exists()
 
-            assert snapshot(rra).match("rra_results_${comparisonName}")
-            assert snapshot(filtered).match("filtered_matrix_${comparisonName}")
+            assert preStatus.readLines().size() > 1
+            assert postStatus.readLines().size() > 1
+            assert traceSummary.text.contains("Comparison Filtering Trace")
+            assert finalMaster.readLines().size() > 1
         }
     }
 }

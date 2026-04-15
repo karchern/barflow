@@ -63,7 +63,7 @@ if( !allowedFilterValues.contains(params.filter_on_what as String) ) {
     System.exit(1)
 }
 
-workflow {
+workflow barseq_pipeline {
 
     sample_goodbarcodes_library_map = Channel.fromPath(params.sample_goodbarcodes_library_map)
                                       .splitCsv(header:false)
@@ -130,6 +130,16 @@ workflow {
             concat_mbarq_qc_results.out.all_comparisons_master_log
     )
 
+}
+
+workflow {
+    main:
+    barseq_pipeline()
+}
+
+workflow test {
+    main:
+    barseq_pipeline()
 }
 
 process create_master_comparison_log_proc {

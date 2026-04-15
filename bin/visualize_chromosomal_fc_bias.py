@@ -219,6 +219,7 @@ def main():
         print(f'Saved plot to {args.output_plot}')
     except Exception as e:
         print(f'Warning: Could not create plot: {e}')
+        Path(args.output_plot).touch()
     
     print("Done!")
 

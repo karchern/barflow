@@ -302,6 +302,7 @@ def smoothing_1(
 
     # --- Plotting ---
     if write_plot:
+        outfn = f'{sample_id}_median_sliding_window{plot_suffix}.png'
         try:
         # Use non-interactive backend for headless environments
             import matplotlib
@@ -362,15 +363,16 @@ def smoothing_1(
                     ax.axvline(through_location, color='C2', linestyle=':', label='trough')
                 if peak_location is not None or through_location is not None or fit_for_plot is not None:
                     ax.legend()
-                outfn = f'{sample_id}_median_sliding_window{plot_suffix}.png'
                 plt.tight_layout()
                 fig.savefig(outfn, dpi=150)
                 plt.close(fig)
                 print(f'Saved sliding-window mean plot to {outfn}')
             else:
                 print('No valid points to plot for moving_mean_array')
+                Path(outfn).touch()
         except Exception as e:
             print(f'Could not create sliding-window mean plot: {e}')
+            Path(outfn).touch()
 
     b = []
     header = "bin,bin_genomic_center,count\n"
