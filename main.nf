@@ -137,11 +137,6 @@ workflow {
     barseq_pipeline()
 }
 
-workflow test {
-    main:
-    barseq_pipeline()
-}
-
 process create_master_comparison_log_proc {
     tag { comparison_name }
     label 'r_basic'

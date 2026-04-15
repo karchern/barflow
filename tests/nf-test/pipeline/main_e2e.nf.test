@@ -3,7 +3,6 @@ nextflow_pipeline {
     name "Pipeline E2E Liu_2021_QUICK"
     tag "e2e"
     script "../../../main.nf"
-    options "-entry test"
 
     test("runs Liu_2021_QUICK end-to-end") {
 
