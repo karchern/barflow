@@ -31,8 +31,8 @@ def format_sample_reason(sample_id, sample_metrics):
     info = sample_metrics.get(sample_id, {})
     qc_failure_reason = info.get('qc_failure_reason', '') or 'unknown'
     total_reads = info.get('total_reads', 'NA')
-    median_count = info.get('median_count', 'NA')
-    return f"{sample_id}[reason={qc_failure_reason};total_reads={total_reads};median_count={median_count}]"
+    mean_count = info.get('mean_count', 'NA')
+    return f"{sample_id}[reason={qc_failure_reason};total_reads={total_reads};mean_count={mean_count}]"
 
 
 def build_summary_text(summary_df, reason_counts_df, sample_contrib_df):
@@ -66,7 +66,7 @@ def build_summary_text(summary_df, reason_counts_df, sample_contrib_df):
             lines.append(
                 f"  {row['sample_id']}: {row['n_dropped_comparisons']} dropped comparisons | "
                 f"qc_failure_reason={row['qc_failure_reason']} | "
-                f"total_reads={row['total_reads']} | median_count={row['median_count']}"
+                f"total_reads={row['total_reads']} | mean_count={row['mean_count']}"
             )
 
     return '\n'.join(lines) + '\n'
@@ -77,7 +77,7 @@ def main():
     parser.add_argument('--comparisons-json', required=True)
     parser.add_argument('--sample-metrics', required=True)
     parser.add_argument('--min-read-sum-for-qc', type=int, required=True)
-    parser.add_argument('--min-median-barcode-count', type=float, required=True)
+    parser.add_argument('--min-mean-barcode-count', type=float, required=True)
     parser.add_argument('--output-comparison-trace', required=True)
     parser.add_argument('--output-comparison-sample-trace', required=True)
     parser.add_argument('--output-drop-reason-counts', required=True)
@@ -93,7 +93,7 @@ def main():
     if 'qc_passed' not in metrics.columns:
         metrics['qc_passed'] = (
             (metrics['total_reads'] >= args.min_read_sum_for_qc)
-            & (metrics['median_count'] >= args.min_median_barcode_count)
+            & (metrics['mean_count'] >= args.min_mean_barcode_count)
         ).astype(int)
 
     if 'qc_failure_reason' not in metrics.columns:
@@ -102,8 +102,8 @@ def main():
             reasons = []
             if row['total_reads'] < args.min_read_sum_for_qc:
                 reasons.append('total_reads_below_threshold')
-            if row['median_count'] < args.min_median_barcode_count:
-                reasons.append('median_barcode_count_below_threshold')
+            if row['mean_count'] < args.min_mean_barcode_count:
+                reasons.append('mean_barcode_count_below_threshold')
             failure_reasons.append(';'.join(reasons))
         metrics['qc_failure_reason'] = failure_reasons
 
@@ -156,7 +156,7 @@ def main():
                     'sample_qc_passed': info.get('qc_passed', ''),
                     'sample_qc_failure_reason': info.get('qc_failure_reason', ''),
                     'total_reads': info.get('total_reads', ''),
-                    'median_count': info.get('median_count', ''),
+                    'mean_count': info.get('mean_count', ''),
                 })
 
                 if dropped_after_qc and dropped_by_qc:
@@ -164,7 +164,7 @@ def main():
                     dropped_sample_details[sample_id] = {
                         'qc_failure_reason': info.get('qc_failure_reason', ''),
                         'total_reads': info.get('total_reads', ''),
-                        'median_count': info.get('median_count', ''),
+                        'mean_count': info.get('mean_count', ''),
                     }
 
         comparison_rows.append({
@@ -216,7 +216,7 @@ def main():
             'n_dropped_comparisons': count,
             'qc_failure_reason': details['qc_failure_reason'],
             'total_reads': details['total_reads'],
-            'median_count': details['median_count'],
+            'mean_count': details['mean_count'],
         })
     sample_contrib_df = pd.DataFrame(sample_contrib_rows)
 

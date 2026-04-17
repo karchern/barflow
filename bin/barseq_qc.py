@@ -402,7 +402,7 @@ parser.add_argument('--output_barcode_metrics', type=str, required=True, help="O
 parser.add_argument('--output_median_of_means_over_genomes', type=str, required=True, help="TODO")
 parser.add_argument('--output_passed', type=str, required=True, help="Output file to write '1' if sample passed QC, '0' otherwise.")
 parser.add_argument('--min_read_sum_for_qc', type=int, help="Minimum total read count for sample to pass QC.")
-parser.add_argument('--min_median_barcode_count', type=int, help="Minimum median barcode count for sample to pass QC.")
+parser.add_argument('--min_mean_barcode_count', type=int, help="Minimum mean barcode count for sample to pass QC.")
 parser.add_argument('--enable_ptr_correction', type=parse_bool, default=True, help="Enable PTR-based per-barcode correction before positional aggregation.")
 
 parser.add_argument('--output_corrected_counts', type=str, required=True, help="Output corrected counts file in 2fast2q format.")
@@ -524,14 +524,14 @@ rss_ratio       = PTR_results_pre[0][10]
 
 qc_passed = (
     total_reads >= int(args.min_read_sum_for_qc)
-    and median_count >= int(args.min_median_barcode_count)
+    and mean_count >= int(args.min_mean_barcode_count)
 )
 
 qc_failure_reasons = []
 if total_reads < int(args.min_read_sum_for_qc):
     qc_failure_reasons.append('total_reads_below_threshold')
-if median_count < int(args.min_median_barcode_count):
-    qc_failure_reasons.append('median_barcode_count_below_threshold')
+if mean_count < int(args.min_mean_barcode_count):
+    qc_failure_reasons.append('mean_barcode_count_below_threshold')
 
 qc_failure_reason = ';'.join(qc_failure_reasons) if qc_failure_reasons else ''
 
@@ -547,7 +547,7 @@ rows.append({
     'qc_passed': int(qc_passed),
     'qc_failure_reason': qc_failure_reason,
     'qc_min_read_sum_threshold': int(args.min_read_sum_for_qc),
-    'qc_min_median_barcode_count_threshold': int(args.min_median_barcode_count),
+    'qc_min_mean_barcode_count_threshold': int(args.min_mean_barcode_count),
     'total_reads': total_reads,
     'n_barcodes_detected': n_barcodes_detected,
     'max_count': max_count,

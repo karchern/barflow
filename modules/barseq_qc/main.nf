@@ -62,7 +62,7 @@ workflow barseq_qc_wf {
     def comparisons_status_list = comps[1]
 
     // Pre-QC comparison validation (materialized list is acceptable here)
-    comparison_validation_log_pre_qc = validate_comparisons_pre_qc(comparisons_status_list, "before_barseq_qc")        
+    comparison_validation_log_pre_qc = validate_comparisons_pre_qc(comparisons_status_list, "before_barseq_qc")
 
     // Run per-sample BarSeq QC using the channel of counts
     // all_counts_with_good_barcodes_and_contigs_and_position_ch also contains the sample_goodbarcodes_contig_map and library info - so retain the info
@@ -76,7 +76,7 @@ workflow barseq_qc_wf {
     barseq_qc(
         all_counts_with_good_barcodes_and_contigs_and_position_ch,
         params.minimum_read_sum_for_qc,
-        params.minimum_median_barcode_count,
+        params.minimum_mean_barcode_count,
         params.enable_ptr_correction
     )
 
@@ -116,7 +116,7 @@ workflow barseq_qc_wf {
         collated_qc_results.sample_wise_qc_metrics,
         file(params.comparisons),
         params.minimum_read_sum_for_qc,
-        params.minimum_median_barcode_count
+        params.minimum_mean_barcode_count
     )
 
     comparisons_status_post_filter_PASSED_list = comparisons_status_post_filter_list
@@ -214,7 +214,7 @@ process trace_comparison_filtering {
     path sample_wise_qc_metrics
     path comparisons_json
     val minimum_read_sum_for_qc
-    val minimum_median_barcode_count
+    val minimum_mean_barcode_count
 
     output:
     path("comparison_trace.tsv"), emit: comparison_trace_tsv
@@ -228,7 +228,7 @@ process trace_comparison_filtering {
         --comparisons-json ${comparisons_json} \
         --sample-metrics ${sample_wise_qc_metrics} \
         --min-read-sum-for-qc ${minimum_read_sum_for_qc} \
-        --min-median-barcode-count ${minimum_median_barcode_count} \
+        --min-mean-barcode-count ${minimum_mean_barcode_count} \
         --output-comparison-trace comparison_trace.tsv \
         --output-comparison-sample-trace comparison_sample_trace.tsv \
         --output-drop-reason-counts comparison_drop_reason_counts.tsv \
@@ -245,7 +245,7 @@ process barseq_qc {
     input:
     tuple val(sample_id), path(counts_path), path(sample_goodbarcodes_contig_position_map), val(library)
     val(minimum_read_sum_for_qc)
-    val(minimum_median_barcode_count)
+    val(minimum_mean_barcode_count)
     val(enable_ptr_correction)
 
     output:
@@ -262,7 +262,7 @@ process barseq_qc {
         --output_corrected_counts ${sample_id}.corrected.2fast2q \
         --enable_ptr_correction ${enable_ptr_correction} \
         --min_read_sum_for_qc ${minimum_read_sum_for_qc} \
-        --min_median_barcode_count ${minimum_median_barcode_count}
+        --min_mean_barcode_count ${minimum_mean_barcode_count}
     """
 }
 

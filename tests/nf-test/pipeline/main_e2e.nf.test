@@ -18,7 +18,7 @@ nextflow_pipeline {
                 stop_after_barcode_extraction = false
                 enable_ptr_correction = true
                 minimum_read_sum_for_qc = 10000
-                minimum_median_barcode_count = 1
+                minimum_mean_barcode_count = 1
                 mbarq_normalization = "median"
                 remove_all_0_barcodes = true
                 lowly_abundant_barcode_cutoff = 5
