@@ -152,10 +152,21 @@ def main():
     
     print(f"Found {len(merged_df)} barcodes with LFC and contig/position info.")
     
-    # Determine main contig
+    # Determine main contig. When the genome is highly fragmented (multi-contig
+    # assemblies without a dominant chromosome — e.g. some Bacteroides/Phocaeicola
+    # libraries), `determine_main_contig` raises ValueError. In that case the
+    # plot isn't meaningful, so write empty stub outputs and exit cleanly so the
+    # rest of the pipeline can continue.
     print("Determining main contig...")
-    main_contig = determine_main_contig(merged_df)
-    
+    try:
+        main_contig = determine_main_contig(merged_df)
+    except ValueError as e:
+        print(f"[chromosomal FC bias skipped] {e}")
+        # Write empty stub outputs to satisfy nextflow's `path()` requirements.
+        pd.DataFrame(columns=['bin_center', 'smoothed_lfc', 'observed_barcodes_in_window']).to_csv(args.output_data, index=False)
+        Path(args.output_plot).touch()
+        return
+
     # Filter to main contig
     merged_df = merged_df[merged_df['contig'] == main_contig].copy()
     print(f"Using contig {main_contig} with {len(merged_df)} mapped barcodes.")

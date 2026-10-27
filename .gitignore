@@ -13,3 +13,4 @@ PROCESS_STUFF/*
 tests/nf-test-e2e-*.out
 tests/nf-test-e2e-*.err
 raw_data/*
+bin/__pycache__/
