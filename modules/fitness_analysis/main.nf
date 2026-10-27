@@ -279,6 +279,11 @@ process visualize_chromosomal_fc_bias {
           path("${comparison_name}.chromosomal_fc_bias.csv"),
           emit: fc_bias_data_ch
 
+    tuple val(comparison_name),
+          path("${comparison_name}.chromosomal_fc_bias.SKIPPED.txt"),
+          optional: true,
+          emit: fc_bias_skipped_ch
+
 
     script:
     """
@@ -288,7 +293,8 @@ process visualize_chromosomal_fc_bias {
       --comparison-id ${comparison_name} \
       --window 10000 \
       --output-plot ${comparison_name}.chromosomal_fc_bias.png \
-      --output-data ${comparison_name}.chromosomal_fc_bias.csv
+      --output-data ${comparison_name}.chromosomal_fc_bias.csv \
+      --output-skipped ${comparison_name}.chromosomal_fc_bias.SKIPPED.txt
     """
 }
 
@@ -409,6 +415,9 @@ workflow fitness_analysis {
     fc_bias_plots = visualize_chromosomal_fc_bias(
         to_fc_bias
     )
+    fc_bias_plots.fc_bias_skipped_ch.subscribe { name, skipped_file ->
+        log.warn skipped_file.text.trim()
+    }
 
 
     // collect step logs and build master logs

@@ -10,6 +10,7 @@ log2FC values in a smoothed window over the main chromosome.
 import pandas as pd
 import numpy as np
 import argparse
+import sys
 from pathlib import Path
 
 def determine_main_contig(df_with_good_barcodes_and_contigs):
@@ -51,6 +52,28 @@ def determine_main_contig(df_with_good_barcodes_and_contigs):
             f"We have {len(unique_contigs)} contigs. Cannot proceed with chromosomal FC visualization "
             "since it relies on having a single main contig."
         )
+
+
+def write_skipped_outputs(args, reason):
+    """Plot cannot be made: warn on stderr, write the reason to --output-skipped (nextflow turns
+    that file into a log.warn), and write placeholder outputs so the process' path() outputs exist.
+    The placeholder PNG shows the reason instead of being an empty file."""
+    msg = f"[chromosomal FC bias skipped] {args.comparison_id}: {reason}"
+    print(f"WARNING: {msg}", file=sys.stderr)
+    Path(args.output_skipped).write_text(msg + "\n")
+    pd.DataFrame(columns=['bin_center', 'smoothed_lfc', 'observed_barcodes_in_window']).to_csv(args.output_data, index=False)
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(figsize=(14, 2))
+        ax.axis('off')
+        ax.text(0.01, 0.5, msg, ha='left', va='center', fontsize=10, wrap=True)
+        fig.savefig(args.output_plot, dpi=100)
+        plt.close(fig)
+    except Exception as e:
+        print(f"WARNING: could not draw placeholder plot: {e}", file=sys.stderr)
+        Path(args.output_plot).touch()
 
 
 def smooth_fc_values(positions, lfc_values, window=10000):
@@ -133,6 +156,8 @@ def main():
                         help="Output plot filename (PNG)")
     parser.add_argument('--output-data', type=str, required=True,
                         help="Output data CSV (bin centers, smoothed LFC, count per window)")
+    parser.add_argument('--output-skipped', type=str, required=True,
+                        help="Written (with the reason) only if the plot could not be made")
     
     args = parser.parse_args()
     
@@ -154,17 +179,15 @@ def main():
     
     # Determine main contig. When the genome is highly fragmented (multi-contig
     # assemblies without a dominant chromosome — e.g. some Bacteroides/Phocaeicola
-    # libraries), `determine_main_contig` raises ValueError. In that case the
-    # plot isn't meaningful, so write empty stub outputs and exit cleanly so the
-    # rest of the pipeline can continue.
+    # libraries), `determine_main_contig` raises ValueError. The plot isn't meaningful
+    # then, so skip it with a warning (surfaced by nextflow) and let the pipeline continue.
+    # Other contigs (e.g. plasmids) are still part of the mbarq analysis; only this plot
+    # is restricted to the main contig.
     print("Determining main contig...")
     try:
         main_contig = determine_main_contig(merged_df)
     except ValueError as e:
-        print(f"[chromosomal FC bias skipped] {e}")
-        # Write empty stub outputs to satisfy nextflow's `path()` requirements.
-        pd.DataFrame(columns=['bin_center', 'smoothed_lfc', 'observed_barcodes_in_window']).to_csv(args.output_data, index=False)
-        Path(args.output_plot).touch()
+        write_skipped_outputs(args, str(e))
         return
 
     # Filter to main contig
@@ -229,8 +252,7 @@ def main():
         
         print(f'Saved plot to {args.output_plot}')
     except Exception as e:
-        print(f'Warning: Could not create plot: {e}')
-        Path(args.output_plot).touch()
+        write_skipped_outputs(args, f"plotting failed: {e}")
     
     print("Done!")
 
