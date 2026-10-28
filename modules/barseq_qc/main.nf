@@ -4,6 +4,7 @@ include { get_comparison_status as validate_comparisons_pre_qc } from './../util
 include { get_comparison_status as validate_comparisons_post_qc } from './../utils'
 include {
     buildComparisonList
+    check_good_barcodes_files_agree
 } from './../utils'
 
 // Workflow helper: load and validate comparisons, then build the derived channels
@@ -60,6 +61,11 @@ workflow barseq_qc_wf {
     def comps = check_and_validate_comparisons_post_qc(all_counts, comparisons)
     def fitness_analysis_input_ch = comps[0]
     def comparisons_status_list = comps[1]
+
+    check_good_barcodes_files_agree(
+        fitness_analysis_input_ch,
+        all_counts_with_good_barcodes_and_contigs_and_position_ch.map { sid, counts, map_file, library -> tuple(sid as String, map_file) }
+    )
 
     // Pre-QC comparison validation (materialized list is acceptable here)
     comparison_validation_log_pre_qc = validate_comparisons_pre_qc(comparisons_status_list, "before_barseq_qc")

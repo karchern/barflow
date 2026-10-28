@@ -156,3 +156,47 @@ def stop_after_barcode_extraction_and_warn(all_counts) {
     }
     return false
 }
+// Samples that have no entry in the sample -> good-barcodes map would be dropped silently by join().
+// Warn about them (the join itself stays where it is, so behaviour is otherwise unchanged).
+def warn_samples_missing_from_sample_map(reads_ch, sample_goodbarcodes_library_map) {
+    // join(remainder: true) emits [id, reads, null] for a sample without a map entry
+    reads_ch.join(sample_goodbarcodes_library_map, remainder: true)
+        .filter { row -> row[1] != null && row[2] == null }
+        .map { row -> row[0] as String }
+        .toSortedList()
+        .subscribe { ids ->
+            if( ids ) {
+                log.warn "\u001b[33m${ids.size()} sample(s) have no entry in --sample_goodbarcodes_library_map (${params.sample_goodbarcodes_library_map}) and are DROPPED from the analysis:\n  " + ids.join('\n  ') + "\u001b[0m"
+            }
+        }
+}
+
+def same_good_barcodes_file(a, b) {
+    def pa = a as java.nio.file.Path
+    def pb = b as java.nio.file.Path
+    if( !java.nio.file.Files.exists(pa) || !java.nio.file.Files.exists(pb) ) return false
+    // same file (incl. via symlinks), or byte-identical copies
+    return java.nio.file.Files.isSameFile(pa, pb) || java.nio.file.Files.mismatch(pa, pb) == -1L
+}
+
+// The good-barcodes file reaches the pipeline twice: per sample via the sample map (used by barseq_qc)
+// and per comparison via comparisons.json (used by merge_barcode_matrices and the fc-bias plot).
+// Fail if, for any sample in a comparison, the two do not point to the same (or a byte-identical) file.
+def check_good_barcodes_files_agree(comparison_input_ch, sample_to_map_file_ch) {
+    comparison_input_ch
+        .flatMap { name, treat_ids, treat_paths, ctrl_ids, ctrl_paths, good_barcodes_file ->
+            (treat_ids + ctrl_ids).collect { sid -> tuple(sid as String, name, good_barcodes_file) }
+        }
+        .combine(sample_to_map_file_ch, by: 0)
+        .filter { sid, name, json_file, map_file ->
+            !(json_file && same_good_barcodes_file(file(json_file as String), map_file))
+        }
+        .map { sid, name, json_file, map_file -> "  ${name} / ${sid}: comparisons.json -> ${json_file} ; sample map -> ${map_file}" }
+        .toSortedList()
+        .map { lines ->
+            if( lines ) {
+                error "Good-barcodes file in --comparisons differs from the one in --sample_goodbarcodes_library_map (or is missing) for ${lines.size()} comparison/sample pair(s):\n" + lines.join('\n')
+            }
+            lines
+        }
+}

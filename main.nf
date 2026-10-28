@@ -6,6 +6,7 @@ include { barseq_qc_wf } from './modules/barseq_qc'
 include {
     createSampleInputChannelAndDecideIfToRun2Fast2Q
     stop_after_barcode_extraction_and_warn
+    warn_samples_missing_from_sample_map
 } from './modules/utils'
 include { fitness_analysis } from './modules/fitness_analysis'
 
@@ -80,6 +81,8 @@ workflow barseq_pipeline {
 
     def reads_ch   = input_info.reads_ch
     def run_counts = input_info.run_counts
+
+    warn_samples_missing_from_sample_map(reads_ch, sample_goodbarcodes_library_map)
 
     if( run_counts ) {
         // join read_ch and sample_goodbarcodes_library_map on first field to get 3-element tuples
